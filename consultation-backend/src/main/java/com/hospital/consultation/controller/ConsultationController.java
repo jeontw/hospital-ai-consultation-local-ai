@@ -9,13 +9,13 @@ import com.hospital.consultation.entity.Patient;
 import com.hospital.consultation.repository.AiAnalysisRepository;
 import com.hospital.consultation.repository.ConsultationRepository;
 import com.hospital.consultation.repository.PatientRepository;
-import com.hospital.consultation.service.OpenAiService;
-import com.hospital.consultation.service.OpenAiWhisperService;
+import com.hospital.consultation.service.LocalWhisperService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import com.hospital.consultation.service.AudioConvertService;
+import com.hospital.consultation.service.AiService;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -27,8 +27,8 @@ public class ConsultationController {
 
     private final ConsultationRepository consultationRepository;
     private final PatientRepository patientRepository;
-    private final OpenAiService openAiService;
-    private final OpenAiWhisperService openAiWhisperService;
+    private final AiService aiService;
+    private final LocalWhisperService localWhisperService;
     private final AiAnalysisRepository aiAnalysisRepository;
     private final ObjectMapper objectMapper;
     private final AudioConvertService audioConvertService;
@@ -43,7 +43,7 @@ public class ConsultationController {
 
         String originalText = requestDto.getOriginalText();
 
-        String summary = openAiService.summarize(originalText);
+        String summary = aiService.summarize(originalText);
 
         Consultation consultation = new Consultation();
         consultation.setPatient(patient);
@@ -54,7 +54,7 @@ public class ConsultationController {
 
         Consultation savedConsultation = consultationRepository.save(consultation);
 
-        String analysisJson = openAiService.analyze(originalText);
+        String analysisJson = aiService.analyze(originalText);
 
         AiAnalysisResultDto result =
                 objectMapper.readValue(analysisJson, AiAnalysisResultDto.class);
@@ -136,7 +136,7 @@ public class ConsultationController {
 진단하지 말고 상담 보조 형태로 작성해주세요.
 """);
 
-        return openAiService.summarize(prompt.toString());
+        return aiService.summarize(prompt.toString());
     }
 
     @GetMapping("/analysis")
@@ -184,11 +184,11 @@ public class ConsultationController {
         }
 
         String originalText =
-                openAiWhisperService.transcribe(
+                localWhisperService.transcribe(
                         new java.io.File(convertedPath)
                 );
 
-        String summary = openAiService.summarize(originalText);
+        String summary = aiService.summarize(originalText);
 
         Consultation consultation = new Consultation();
         consultation.setPatient(patient);
@@ -199,7 +199,7 @@ public class ConsultationController {
 
         Consultation savedConsultation = consultationRepository.save(consultation);
 
-        String analysisJson = openAiService.analyze(originalText);
+        String analysisJson = aiService.analyze(originalText);
 
         AiAnalysisResultDto result =
                 objectMapper.readValue(analysisJson, AiAnalysisResultDto.class);
@@ -228,7 +228,7 @@ public class ConsultationController {
 
         consultation.setOriginalText(originalText);
 
-        String summary = openAiService.summarize(originalText);
+        String summary = aiService.summarize(originalText);
         consultation.setSummary(summary);
 
         Consultation savedConsultation = consultationRepository.save(consultation);
@@ -240,7 +240,7 @@ public class ConsultationController {
             aiAnalysis.setConsultation(savedConsultation);
         }
 
-        String analysisJson = openAiService.analyze(originalText);
+        String analysisJson = aiService.analyze(originalText);
 
         AiAnalysisResultDto result =
                 objectMapper.readValue(analysisJson, AiAnalysisResultDto.class);

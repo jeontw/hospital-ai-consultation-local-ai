@@ -5,17 +5,20 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.util.List;
 import java.util.Map;
 
 @Service
+@ConditionalOnProperty(name = "ai.provider", havingValue = "openai")
 @RequiredArgsConstructor
-public class OpenAiService {
+public class OpenAiService implements AiService {
 
     @Value("${openai.api.key}")
     private String apiKey;
 
+    @Override
     public String summarize(String text) {
 
         String url = "https://api.openai.com/v1/chat/completions";
