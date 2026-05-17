@@ -39,6 +39,7 @@ function App() {
   const [selectedConsultation, setSelectedConsultation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState(null);
+  const [loadingMessage, setLoadingMessage] = useState("");
 
   const fileInputRef = useRef(null);
 
@@ -139,6 +140,7 @@ function App() {
   };
   const addConsultation = async () => {
     setIsLoading(true);
+    setLoadingMessage("음성 파일 업로드 중...");
     if (!selectedPatientId) {
       alert("환자를 선택하세요");
       return;
@@ -152,8 +154,10 @@ function App() {
     try {
       const formData = new FormData();
       formData.append("file", audioFile);
+      setLoadingMessage("음성 변환 및 STT 분석 중...");
 
       await uploadConsultationAudio(selectedPatientId, formData);
+      setLoadingMessage("AI 상담 내용 분석 및 저장 중...");
       alert("상담 등록 성공");
 
       setSelectedPatientId("");
@@ -169,6 +173,7 @@ function App() {
       alert("상담 등록 실패");
     } finally {
       setIsLoading(false);
+      setLoadingMessage("");
     }
   };
   const deleteConsultation = async (consultationId) => {
@@ -265,6 +270,7 @@ function App() {
         addConsultation={addConsultation}
         fileInputRef={fileInputRef}
         isLoading={isLoading}
+        loadingMessage={loadingMessage}
       />
 
       <div className="grid grid-cols-2 gap-6">

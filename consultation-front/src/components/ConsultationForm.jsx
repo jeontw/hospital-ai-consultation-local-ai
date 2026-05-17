@@ -6,6 +6,7 @@ function ConsultationForm({
   addConsultation,
   fileInputRef,
   isLoading,
+  loadingMessage,
 }) {
   return (
     <div className="bg-white rounded-2xl shadow p-6 mb-6">
@@ -43,8 +44,13 @@ function ConsultationForm({
               : "bg-blue-500 hover:bg-blue-600"
           }`}
         >
-          {isLoading ? "AI 분석 중..." : "상담 등록"}
+          {isLoading ? "처리 중..." : "상담 등록"}
         </button>
+        {isLoading && (
+          <p className="text-sm text-blue-600 font-semibold animate-pulse">
+            {loadingMessage || "AI 분석 중입니다..."}
+          </p>
+        )}
       </div>
     </div>
   );

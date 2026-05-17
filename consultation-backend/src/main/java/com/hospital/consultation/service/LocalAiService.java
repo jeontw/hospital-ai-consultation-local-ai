@@ -28,20 +28,22 @@ public class LocalAiService implements AiService {
     @Override
     public String analyze(String text) {
         String prompt = """
-                당신은 병원 전화 상담 내용을 분석하는 AI입니다.
-                반드시 한국어로만 답변하세요.
-                반드시 JSON 형식으로만 응답하세요.
-                설명 문장, 마크다운, 코드블럭은 절대 쓰지 마세요.
+        당신은 병원 전화 상담 내용을 분석하는 AI입니다.
+        반드시 한국어로만 답변하세요.
 
-                JSON 형식:
-                {
-                  "symptoms": "주요 증상",
-                  "riskLevel": "낮음 또는 보통 또는 높음",
-                  "keywords": "키워드1, 키워드2, 키워드3"
-                }
+        아래 JSON 객체 하나만 출력하세요.
+        JSON 앞뒤에 설명, 마크다운, 코드블럭을 절대 붙이지 마세요.
+        riskLevel은 반드시 "낮음", "보통", "높음" 중 하나만 사용하세요.
+        keywords는 쉼표로 구분된 문자열로 작성하세요.
 
-                상담 내용:
-                """ + text;
+        {
+          "symptoms": "주요 증상",
+          "riskLevel": "낮음",
+          "keywords": "키워드1, 키워드2, 키워드3"
+        }
+
+        상담 내용:
+        """ + text;
 
         return extractJson(callOllama(prompt));
     }
@@ -54,8 +56,9 @@ public class LocalAiService implements AiService {
             headers.setContentType(MediaType.APPLICATION_JSON);
 
             Map<String, Object> options = Map.of(
-                    "temperature", 0.2,
-                    "num_predict", 300
+                    "temperature", 0.1,
+                    "num_predict", 250,
+                    "top_p", 0.8
             );
 
             Map<String, Object> body = Map.of(
@@ -78,7 +81,7 @@ public class LocalAiService implements AiService {
             return (String) response.getBody().get("response");
 
         } catch (Exception e) {
-            return "로컬 AI 연결 실패: Ollama가 실행 중인지 확인해주세요.";
+            return "로컬 AI 연결 실패: Ollama 앱이 실행 중인지 확인하고, 모델이 설치되어 있는지 확인해주세요. 현재 모델: " + model;
         }
     }
     private String extractJson(String response) {
