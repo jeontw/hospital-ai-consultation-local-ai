@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
-import jakarta.persistence.Column;
 
 import java.time.LocalDateTime;
 
@@ -19,6 +18,9 @@ public class Consultation {
 
     @Column(columnDefinition = "TEXT")
     private String originalText;
+
+    @Column(columnDefinition = "LONGTEXT")
+    private String speakerText;
 
     @Column(columnDefinition = "TEXT")
     private String summary;
@@ -35,5 +37,4 @@ public class Consultation {
     @OneToOne(mappedBy = "consultation", cascade = CascadeType.ALL)
     @JsonIgnoreProperties({"consultation"})
     private AiAnalysis aiAnalysis;
-
 }

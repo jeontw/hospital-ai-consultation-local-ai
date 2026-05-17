@@ -5,4 +5,6 @@ public interface AiService {
     String summarize(String text);
 
     String analyze(String text);
+
+    String separateSpeakers(String text);
 }

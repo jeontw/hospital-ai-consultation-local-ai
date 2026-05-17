@@ -3,10 +3,14 @@ package com.hospital.consultation.service;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import lombok.RequiredArgsConstructor;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
 import java.util.Map;
 
 @Service
+@ConditionalOnProperty(name = "ai.provider", havingValue = "local")
+@RequiredArgsConstructor
 public class LocalAiService implements AiService {
 
     private final String ollamaUrl = "http://localhost:11434/api/generate";
@@ -56,9 +60,9 @@ public class LocalAiService implements AiService {
             headers.setContentType(MediaType.APPLICATION_JSON);
 
             Map<String, Object> options = Map.of(
-                    "temperature", 0.1,
-                    "num_predict", 250,
-                    "top_p", 0.8
+                    "temperature", 0,
+                    "num_predict", 500,
+                    "top_p", 0.1
             );
 
             Map<String, Object> body = Map.of(
@@ -100,5 +104,28 @@ public class LocalAiService implements AiService {
               "keywords": "없음"
             }
             """;
+    }
+    @Override
+    public String separateSpeakers(String text) {
+        String prompt = """
+            당신은 병원 전화 상담 STT 결과에 화자 라벨을 붙이는 AI입니다.
+
+            매우 중요한 규칙:
+            - 출력 라벨은 반드시 "상담사:" 또는 "환자:" 두 개만 사용하세요.
+            - "환자분:" 이라는 라벨은 절대 사용하지 마세요.
+            - 원문 문장의 순서를 절대 바꾸지 마세요.
+            - 원문에 있는 문장을 삭제하지 마세요.
+            - 원문에 없는 문장을 추가하지 마세요.
+            - 문장 내용을 새로 만들지 마세요.
+            - 각 발화 앞에 라벨만 붙이세요.
+            - "환자분 어서 오세요"는 반드시 상담사 발화입니다.
+            - "약을 처방해 드리겠습니다", "운동을 하시면 됩니다", "비타민 D가 중요합니다"는 상담사 발화입니다.
+            - 검사 결과, 불편함, 생활 습관 설명은 환자 발화입니다.
+            - 설명, 제목, 분석은 쓰지 마세요.
+
+            상담 내용:
+            """ + text;
+
+        return callOllama(prompt);
     }
 }

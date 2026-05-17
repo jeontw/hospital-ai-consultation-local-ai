@@ -43,7 +43,11 @@ public class ConsultationController {
 
         String originalText = requestDto.getOriginalText();
 
+        String speakerText =
+                aiService.separateSpeakers(originalText);
+
         String summary = aiService.summarize(originalText);
+
 
         Consultation consultation = new Consultation();
         consultation.setPatient(patient);
@@ -51,6 +55,7 @@ public class ConsultationController {
         consultation.setAudioPath(requestDto.getAudioPath());
         consultation.setSummary(summary);
         consultation.setCreatedAt(LocalDateTime.now());
+        consultation.setSpeakerText(speakerText);
 
         Consultation savedConsultation = consultationRepository.save(consultation);
 
@@ -188,6 +193,9 @@ public class ConsultationController {
                         new java.io.File(convertedPath)
                 );
 
+        String speakerText =
+                aiService.separateSpeakers(originalText);
+
         String summary = aiService.summarize(originalText);
 
         Consultation consultation = new Consultation();
@@ -196,6 +204,7 @@ public class ConsultationController {
         consultation.setSummary(summary);
         consultation.setAudioPath("/uploads/" + fileName);
         consultation.setCreatedAt(LocalDateTime.now());
+        consultation.setSpeakerText(speakerText);
 
         Consultation savedConsultation = consultationRepository.save(consultation);
 
@@ -228,7 +237,13 @@ public class ConsultationController {
 
         consultation.setOriginalText(originalText);
 
+        String speakerText =
+                aiService.separateSpeakers(originalText);
+
+        consultation.setSpeakerText(speakerText);
+
         String summary = aiService.summarize(originalText);
+
         consultation.setSummary(summary);
 
         Consultation savedConsultation = consultationRepository.save(consultation);

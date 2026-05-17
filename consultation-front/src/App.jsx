@@ -156,9 +156,16 @@ function App() {
       formData.append("file", audioFile);
       setLoadingMessage("음성 변환 및 STT 분석 중...");
 
-      await uploadConsultationAudio(selectedPatientId, formData);
+      const response = await uploadConsultationAudio(
+        selectedPatientId,
+        formData,
+      );
+
       setLoadingMessage("AI 상담 내용 분석 및 저장 중...");
+
       alert("상담 등록 성공");
+
+      setSelectedConsultation(response.data);
 
       setSelectedPatientId("");
       setAudioFile(null);
