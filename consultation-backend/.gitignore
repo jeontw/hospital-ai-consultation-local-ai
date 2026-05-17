@@ -38,3 +38,9 @@ out/
 
 uploads/
 application.properties
+uploads/
+application.properties
+
+*.bin
+*.mp3
+*.wav
