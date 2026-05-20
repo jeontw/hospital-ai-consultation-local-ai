@@ -20,7 +20,7 @@ public class AudioConvertService {
             String outputPath = inputPath.substring(0, inputPath.lastIndexOf(".")) + ".mp3";
 
             ProcessBuilder processBuilder = new ProcessBuilder(
-                    "C:\\ffmpeg\\bin\\ffmpeg.exe",
+                    "C:/dev/tools/ffmpeg/bin/ffmpeg.exe",
                     "-y",
                     "-i", inputPath,
                     "-vn",

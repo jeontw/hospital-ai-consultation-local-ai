@@ -1,4 +1,8 @@
-function ConsultationDetail({ selectedConsultation, getRiskColor }) {
+function ConsultationDetail({
+  selectedConsultation,
+  getRiskColor,
+  onOpenInsight,
+}) {
   if (!selectedConsultation) {
     return (
       <div className="mt-6 bg-white rounded-2xl shadow p-6">
@@ -31,6 +35,12 @@ function ConsultationDetail({ selectedConsultation, getRiskColor }) {
           <p>{selectedConsultation.patient?.phone || "전화번호 없음"}</p>
         </div>
 
+        <button
+          onClick={() => onOpenInsight(selectedConsultation.patient)}
+          className="bg-purple-500 text-white px-3 py-1 rounded"
+        >
+          이 환자 AI 인사이트 보기
+        </button>
         <div>
           <p className="font-bold">상담 시간</p>
           <p>{new Date(selectedConsultation.createdAt).toLocaleString()}</p>

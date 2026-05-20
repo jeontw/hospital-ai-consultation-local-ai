@@ -122,11 +122,13 @@ git clone https://github.com/jeontw/hospital-ai-consultation-local-ai.git
 Ollama 설치 후 모델 다운로드:
 
 ollama pull qwen2.5:3b
-3️⃣ whisper.cpp 설치
+
+### 3️⃣ whisper.cpp 설치
 
 권장 구조:
 
-C:/ai/whisper.cpp
+```text
+C:/dev/tools/whisper.cpp
 ├ Release/
 │ └ whisper-cli.exe
 │
@@ -145,8 +147,8 @@ spring.datasource.password=YOUR_DB_PASSWORD
 
 ollama.model=qwen2.5:3b
 
-whisper.exe-path=C:/ai/whisper.cpp/Release/whisper-cli.exe
-whisper.model-path=C:/ai/whisper.cpp/models/ggml-small.bin
+whisper.exe-path=C:/dev/tools/whisper.cpp/Release/whisper-cli.exe
+whisper.model-path=C:/dev/tools/whisper.cpp/models/ggml-medium.bin
 whisper.language=ko
 5️⃣ Backend 실행
 cd consultation-backend
@@ -175,3 +177,4 @@ Docker 기반 배포
 
 본 프로젝트는 소프트웨어학과 졸업작품으로 개발되었으며,
 로컬 AI 기반 의료 상담 보조 시스템 구조를 학습하고 구현하는 것을 목표로 제작되었습니다.
+```

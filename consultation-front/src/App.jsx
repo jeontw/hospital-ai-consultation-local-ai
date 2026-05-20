@@ -358,12 +358,15 @@ function App() {
             getRiskColor={getRiskColor}
           />
 
-          <div className="mt-6">
-            <ConsultationDetail
-              selectedConsultation={selectedConsultation}
-              getRiskColor={getRiskColor}
-            />
-          </div>
+          <ConsultationDetail
+            selectedConsultation={selectedConsultation}
+            getRiskColor={getRiskColor}
+            onOpenInsight={(patient) => {
+              setSelectedPatient(patient);
+              setSelectedViewPatientId(patient.id);
+              fetchPatientConsultations(patient.id);
+            }}
+          />
         </div>
       </div>
     </div>
