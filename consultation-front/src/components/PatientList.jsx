@@ -49,107 +49,121 @@ function PatientList({
   };
 
   return (
-    <div className="bg-white rounded-2xl shadow p-6 mb-4">
-      <h2 className="text-2xl font-bold mb-4">환자 목록</h2>
+    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex items-center justify-between border-b border-slate-200 pb-3">
+        <h2 className="text-lg font-bold text-slate-900">환자 목록</h2>
+
+        <button
+          onClick={() => onSelectPatient("")}
+          className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+        >
+          전체
+        </button>
+      </div>
 
       <input
         type="text"
         value={searchKeyword}
         onChange={(e) => setSearchKeyword(e.target.value)}
-        className="border p-2 rounded mb-4 w-full"
+        className="mb-4 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
         placeholder="이름, 전화번호, 생년월일 검색"
       />
 
-      <button
-        onClick={() => onSelectPatient("")}
-        className="mb-4 bg-gray-500 text-white px-3 py-1 rounded"
-      >
-        전체 상담 보기
-      </button>
-
       {filteredPatients.length === 0 && (
-        <p className="text-gray-400">검색 결과가 없습니다.</p>
+        <p className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+          검색 결과가 없습니다.
+        </p>
       )}
 
-      {filteredPatients.map((patient) => (
-        <div
-          key={patient.id}
-          onClick={() => onSelectPatient(patient.id)}
-          className={`border-b py-3 cursor-pointer hover:bg-gray-50 rounded px-2 ${
-            String(selectedViewPatientId) === String(patient.id)
-              ? "bg-blue-50"
-              : ""
-          }`}
-        >
-          {editingPatientId === patient.id ? (
-            <div onClick={(e) => e.stopPropagation()} className="space-y-2">
-              <input
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                className="border p-2 rounded w-full"
-                placeholder="이름"
-              />
+      <div className="divide-y divide-slate-200">
+        {filteredPatients.map((patient) => (
+          <div
+            key={patient.id}
+            onClick={() => onSelectPatient(patient.id)}
+            className={`cursor-pointer px-3 py-4 hover:bg-slate-50 ${
+              String(selectedViewPatientId) === String(patient.id)
+                ? "bg-slate-100"
+                : ""
+            }`}
+          >
+            {editingPatientId === patient.id ? (
+              <div onClick={(e) => e.stopPropagation()} className="space-y-2">
+                <input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  placeholder="이름"
+                />
 
-              <input
-                value={editPhone}
-                onChange={(e) => setEditPhone(e.target.value)}
-                className="border p-2 rounded w-full"
-                placeholder="전화번호"
-              />
+                <input
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  placeholder="전화번호"
+                />
 
-              <input
-                value={editBirth}
-                onChange={(e) => setEditBirth(e.target.value)}
-                className="border p-2 rounded w-full"
-                placeholder="생년월일"
-              />
+                <input
+                  value={editBirth}
+                  onChange={(e) => setEditBirth(e.target.value)}
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  placeholder="생년월일"
+                />
 
-              <button
-                onClick={() => saveEdit(patient.id)}
-                className="bg-green-500 text-white px-3 py-1 rounded text-sm"
-              >
-                저장
-              </button>
+                <button
+                  onClick={() => saveEdit(patient.id)}
+                  className="rounded-md bg-slate-800 px-3 py-1.5 text-sm font-medium text-white"
+                >
+                  저장
+                </button>
 
-              <button
-                onClick={cancelEdit}
-                className="ml-2 bg-gray-500 text-white px-3 py-1 rounded text-sm"
-              >
-                취소
-              </button>
-            </div>
-          ) : (
-            <>
-              <p className="font-semibold">{patient.name}</p>
-              <p className="text-gray-500">{patient.phone}</p>
-              <p className="text-gray-400 text-sm">
-                생년월일: {patient.birth || "없음"}
-              </p>
+                <button
+                  onClick={cancelEdit}
+                  className="ml-2 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700"
+                >
+                  취소
+                </button>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-semibold text-slate-900">
+                      {patient.name}
+                    </p>
+                    <p className="text-sm text-slate-500">{patient.phone}</p>
+                    <p className="text-sm text-slate-400">
+                      생년월일: {patient.birth || "없음"}
+                    </p>
+                  </div>
 
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  startEdit(patient);
-                }}
-                className="mt-2 bg-yellow-500 text-white px-3 py-1 rounded text-sm"
-              >
-                수정
-              </button>
+                  <div className="flex shrink-0 gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        startEdit(patient);
+                      }}
+                      className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700"
+                    >
+                      수정
+                    </button>
 
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  deletePatient(patient.id);
-                }}
-                className="mt-2 ml-2 bg-red-500 text-white px-3 py-1 rounded text-sm"
-              >
-                삭제
-              </button>
-            </>
-          )}
-        </div>
-      ))}
-    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deletePatient(patient.id);
+                      }}
+                      className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-xs font-medium text-slate-700"
+                    >
+                      삭제
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 

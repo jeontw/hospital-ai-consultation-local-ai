@@ -352,8 +352,16 @@ function App() {
   }).length;
 
   return (
-    <div className="min-h-screen bg-gray-100 p-10">
-      <h1 className="text-4xl font-bold mb-8">병원 상담 관리 시스템</h1>
+    <div className="min-h-screen bg-slate-100 p-8 text-slate-900">
+      <div className="mb-6 border-b border-slate-200 pb-5">
+        <h1 className="text-3xl font-bold tracking-tight">
+          병원 상담 관리 시스템
+        </h1>
+        <p className="mt-1 text-sm text-slate-500">
+          환자 상담 기록, AI 분석, 예약 정보를 한 화면에서 관리합니다.
+        </p>
+      </div>
+
       <Dashboard
         totalPatients={totalPatients}
         totalConsultations={totalConsultations}
@@ -361,33 +369,35 @@ function App() {
         recentConsultations={recentConsultations}
       />
 
-      <PatientForm
-        name={name}
-        phone={phone}
-        birth={birth}
-        setName={setName}
-        setPhone={setPhone}
-        setBirth={setBirth}
-        addPatient={addPatient}
-      />
+      <div className="mb-6 grid grid-cols-2 gap-6">
+        <PatientForm
+          name={name}
+          phone={phone}
+          birth={birth}
+          setName={setName}
+          setPhone={setPhone}
+          setBirth={setBirth}
+          addPatient={addPatient}
+        />
 
-      <ConsultationForm
-        patients={patients}
-        selectedPatientId={selectedPatientId}
-        setSelectedPatientId={setSelectedPatientId}
-        registrationMode={registrationMode}
-        setRegistrationMode={setRegistrationMode}
-        setAudioFile={setAudioFile}
-        consultationText={consultationText}
-        setConsultationText={setConsultationText}
-        addConsultation={addConsultation}
-        fileInputRef={fileInputRef}
-        isLoading={isLoading}
-        loadingMessage={loadingMessage}
-      />
+        <ConsultationForm
+          patients={patients}
+          selectedPatientId={selectedPatientId}
+          setSelectedPatientId={setSelectedPatientId}
+          registrationMode={registrationMode}
+          setRegistrationMode={setRegistrationMode}
+          setAudioFile={setAudioFile}
+          consultationText={consultationText}
+          setConsultationText={setConsultationText}
+          addConsultation={addConsultation}
+          fileInputRef={fileInputRef}
+          isLoading={isLoading}
+          loadingMessage={loadingMessage}
+        />
+      </div>
 
-      <div className="grid grid-cols-2 gap-6">
-        <div>
+      <div className="grid grid-cols-[minmax(420px,1fr)_minmax(520px,1.25fr)] gap-6">
+        <div className="space-y-6">
           <PatientList
             patients={patients}
             selectedViewPatientId={selectedViewPatientId}
@@ -435,7 +445,7 @@ function App() {
                 fetchPatientConsultations(patientId);
               }
             }}
-            className="border p-2 rounded mb-4 w-full"
+            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
           >
             <option value="">전체 상담 보기</option>
 
@@ -461,7 +471,7 @@ function App() {
           />
         </div>
 
-        <div>
+        <div className="space-y-6">
           <PatientInsight
             selectedPatient={selectedPatient}
             consultations={consultations}

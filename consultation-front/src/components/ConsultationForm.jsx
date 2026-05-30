@@ -13,14 +13,16 @@ function ConsultationForm({
   loadingMessage,
 }) {
   return (
-    <div className="bg-white rounded-2xl shadow p-6 mb-6">
-      <h2 className="text-2xl font-bold mb-4">상담 등록</h2>
+    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 className="mb-4 border-b border-slate-200 pb-3 text-lg font-bold text-slate-900">
+        상담 등록
+      </h2>
 
       <div className="flex flex-col gap-3">
         <select
           value={selectedPatientId}
           onChange={(e) => setSelectedPatientId(e.target.value)}
-          className="border p-2 rounded"
+          className="rounded-md border border-slate-300 px-3 py-2 text-sm"
         >
           <option value="">환자 선택</option>
 
@@ -31,14 +33,14 @@ function ConsultationForm({
           ))}
         </select>
 
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 gap-2">
           <button
             type="button"
             onClick={() => setRegistrationMode("audio")}
-            className={`px-3 py-2 rounded border ${
+            className={`rounded-md border px-3 py-2 text-sm font-medium ${
               registrationMode === "audio"
-                ? "bg-blue-500 text-white border-blue-500"
-                : "bg-white text-gray-700"
+                ? "border-slate-800 bg-slate-800 text-white"
+                : "border-slate-300 bg-white text-slate-700"
             }`}
           >
             음성 파일 업로드
@@ -47,10 +49,10 @@ function ConsultationForm({
           <button
             type="button"
             onClick={() => setRegistrationMode("text")}
-            className={`px-3 py-2 rounded border ${
+            className={`rounded-md border px-3 py-2 text-sm font-medium ${
               registrationMode === "text"
-                ? "bg-blue-500 text-white border-blue-500"
-                : "bg-white text-gray-700"
+                ? "border-slate-800 bg-slate-800 text-white"
+                : "border-slate-300 bg-white text-slate-700"
             }`}
           >
             상담 내용 직접 입력
@@ -63,13 +65,13 @@ function ConsultationForm({
             type="file"
             accept="audio/*"
             onChange={(e) => setAudioFile(e.target.files[0] || null)}
-            className="border p-2 rounded"
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
           />
         ) : (
           <textarea
             value={consultationText}
             onChange={(e) => setConsultationText(e.target.value)}
-            className="border p-2 rounded min-h-36"
+            className="min-h-36 rounded-md border border-slate-300 px-3 py-2 text-sm"
             placeholder="상담 내용을 입력하세요."
           />
         )}
@@ -77,21 +79,21 @@ function ConsultationForm({
         <button
           onClick={addConsultation}
           disabled={isLoading}
-          className={`px-4 py-2 rounded text-white transition ${
+          className={`rounded-md px-4 py-2 text-sm font-semibold text-white transition ${
             isLoading
-              ? "bg-gray-400 cursor-not-allowed animate-pulse"
-              : "bg-blue-500 hover:bg-blue-600"
+              ? "cursor-not-allowed bg-slate-400"
+              : "bg-slate-800 hover:bg-slate-700"
           }`}
         >
           {isLoading ? "처리 중..." : "상담 등록"}
         </button>
         {isLoading && (
-          <p className="text-sm text-blue-600 font-semibold animate-pulse">
+          <p className="text-sm font-medium text-slate-600">
             {loadingMessage || "AI 분석 중입니다..."}
           </p>
         )}
       </div>
-    </div>
+    </section>
   );
 }
 

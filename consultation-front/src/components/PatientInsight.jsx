@@ -30,12 +30,14 @@ function PatientInsight({ selectedPatient, consultations, getRiskColor }) {
 
   if (!selectedPatient) {
     return (
-      <div className="bg-white rounded-2xl shadow p-6">
-        <h2 className="text-2xl font-bold mb-4">환자 인사이트</h2>
-        <p className="text-gray-400">
+      <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <h2 className="mb-4 border-b border-slate-200 pb-3 text-lg font-bold text-slate-900">
+          환자 인사이트
+        </h2>
+        <p className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
           환자를 선택하면 누적 상담 분석이 표시됩니다.
         </p>
-      </div>
+      </section>
     );
   }
 
@@ -74,54 +76,62 @@ function PatientInsight({ selectedPatient, consultations, getRiskColor }) {
   ).length;
 
   return (
-    <div className="bg-white rounded-2xl shadow p-6">
-      <h2 className="text-2xl font-bold mb-4">환자 인사이트</h2>
+    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 className="mb-4 border-b border-slate-200 pb-3 text-lg font-bold text-slate-900">
+        환자 인사이트
+      </h2>
 
-      <div className="mb-6">
-        <p className="text-xl font-bold">{selectedPatient.name}</p>
-        <p className="text-gray-500">{selectedPatient.phone}</p>
-        <p className="text-gray-400 text-sm">
+      <div className="mb-5 rounded-md bg-slate-50 p-4">
+        <p className="text-xl font-bold text-slate-900">
+          {selectedPatient.name}
+        </p>
+        <p className="text-sm text-slate-500">{selectedPatient.phone}</p>
+        <p className="text-sm text-slate-400">
           생년월일: {selectedPatient.birth || "없음"}
         </p>
       </div>
 
-      <div className="grid grid-cols-3 gap-3 mb-6">
-        <div className="border rounded-xl p-4">
-          <p className="text-gray-400 text-sm">누적 상담</p>
-          <p className="text-2xl font-bold">{totalCount}회</p>
+      <div className="mb-5 grid grid-cols-3 gap-3">
+        <div className="rounded-md border border-slate-200 p-4">
+          <p className="text-sm text-slate-400">누적 상담</p>
+          <p className="text-2xl font-bold text-slate-900">{totalCount}회</p>
         </div>
 
-        <div className="border rounded-xl p-4">
-          <p className="text-gray-400 text-sm">주의 상담</p>
-          <p className="text-2xl font-bold">{mediumRiskCount}회</p>
+        <div className="rounded-md border border-slate-200 p-4">
+          <p className="text-sm text-slate-400">주의 상담</p>
+          <p className="text-2xl font-bold text-slate-900">
+            {mediumRiskCount}회
+          </p>
         </div>
 
-        <div className="border rounded-xl p-4">
-          <p className="text-gray-400 text-sm">높음 상담</p>
-          <p className="text-2xl font-bold">{highRiskCount}회</p>
+        <div className="rounded-md border border-slate-200 p-4">
+          <p className="text-sm text-slate-400">높음 상담</p>
+          <p className="text-2xl font-bold text-slate-900">
+            {highRiskCount}회
+          </p>
         </div>
       </div>
 
-      <div className="mb-6 border rounded-xl p-4 bg-gray-50">
-        <div className="mb-6 border rounded-xl p-4 bg-blue-50">
-          <p className="font-bold mb-3 text-blue-700">AI 환자 종합 분석</p>
+      <div className="mb-5 rounded-md border border-slate-200 bg-slate-50 p-4">
+        <div className="mb-5 rounded-md border border-slate-200 bg-white p-4">
+          <p className="mb-3 font-bold text-slate-900">AI 환자 종합 분석</p>
 
           {loadingInsight ? (
-            <p className="text-gray-500 animate-pulse">
+            <p className="text-slate-500">
               AI가 환자 상담 기록을 분석 중입니다...
             </p>
           ) : (
-            <p className="whitespace-pre-wrap text-gray-700">
+            <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">
               {aiInsight || "AI 분석 데이터 없음"}
             </p>
           )}
         </div>
-        <p className="font-bold mb-2">AI 누적 주의점</p>
+        <p className="mb-2 font-bold text-slate-900">AI 누적 주의점</p>
 
         {totalCount === 0 ? (
-          <p className="text-gray-400">상담 기록이 없습니다.</p>
+          <p className="text-sm text-slate-400">상담 기록이 없습니다.</p>
         ) : (
-          <p className="text-gray-700">
+          <p className="text-sm leading-6 text-slate-700">
             이 환자는 현재까지 {totalCount}회의 상담 기록이 있습니다.
             {mediumRiskCount > 0 &&
               ` 주의 단계 상담이 ${mediumRiskCount}회 확인되었습니다.`}
@@ -135,39 +145,37 @@ function PatientInsight({ selectedPatient, consultations, getRiskColor }) {
         )}
       </div>
 
-      <div className="mb-6">
-        <p className="font-bold mb-2">누적 증상</p>
-        <p className="text-gray-700 whitespace-pre-wrap">
+      <div className="mb-5">
+        <p className="mb-2 font-bold text-slate-900">누적 증상</p>
+        <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">
           {symptoms || "누적 증상 데이터 없음"}
         </p>
       </div>
 
-      <div className="mb-6">
-        <p className="font-bold mb-2">누적 키워드</p>
-        <p className="text-gray-700 whitespace-pre-wrap">
+      <div className="mb-5">
+        <p className="mb-2 font-bold text-slate-900">누적 키워드</p>
+        <p className="whitespace-pre-wrap text-sm leading-6 text-slate-700">
           {keywords || "누적 키워드 데이터 없음"}
         </p>
       </div>
 
       <div>
-        <p className="font-bold mb-3">상담 타임라인</p>
+        <p className="mb-3 font-bold text-slate-900">상담 타임라인</p>
 
         {sortedConsultations.length === 0 && (
-          <p className="text-gray-400">상담 기록이 없습니다.</p>
+          <p className="text-sm text-slate-400">상담 기록이 없습니다.</p>
         )}
 
         {sortedConsultations.map((consultation) => (
           <div
             key={consultation.id}
-            className="border-l-4 border-blue-400 pl-4 pb-4 relative"
+            className="border-l border-slate-300 pb-4 pl-4"
           >
-            <div className="absolute -left-[10px] top-1 w-4 h-4 bg-blue-500 rounded-full"></div>
-
-            <p className="text-sm text-gray-400">
+            <p className="text-sm text-slate-400">
               {new Date(consultation.createdAt).toLocaleString()}
             </p>
 
-            <p className="font-semibold mt-1">
+            <p className="mt-1 font-semibold text-slate-900">
               {consultation.summary || "요약 없음"}
             </p>
 
@@ -181,7 +189,7 @@ function PatientInsight({ selectedPatient, consultations, getRiskColor }) {
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 

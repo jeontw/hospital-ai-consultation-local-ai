@@ -11,105 +11,129 @@ function ConsultationList({
   setSelectedConsultation,
   getRiskColor,
 }) {
+  const filteredConsultations = [...consultations]
+    .filter((consultation) => {
+      const normalizedSearchKeyword = searchKeyword.trim().toLowerCase();
+
+      if (!normalizedSearchKeyword) {
+        return true;
+      }
+
+      const patientName = consultation.patient?.name || "";
+      const consultationText = consultation.originalText || "";
+
+      return [patientName, consultationText]
+        .map((value) => value.toLowerCase())
+        .some((value) => value.includes(normalizedSearchKeyword));
+    })
+    .sort((a, b) => b.id - a.id);
+
   return (
-    <div className="bg-white rounded-2xl shadow p-6">
-      <h2 className="text-2xl font-bold mb-4">상담 목록</h2>
+    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 border-b border-slate-200 pb-3">
+        <h2 className="text-lg font-bold text-slate-900">상담 목록</h2>
+      </div>
 
       <input
         type="text"
         placeholder="환자명 또는 상담 내용 검색"
         value={searchKeyword}
         onChange={(e) => setSearchKeyword(e.target.value)}
-        className="border p-2 rounded mb-4 w-full"
+        className="mb-4 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
       />
 
       {consultations.length === 0 && (
-        <p className="text-gray-400">상담 기록이 없습니다.</p>
+        <p className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+          상담 기록이 없습니다.
+        </p>
       )}
 
-      {[...consultations]
-        .filter((consultation) => {
-          const patientName = consultation.patient?.name || "";
-          const consultationText = consultation.originalText || "";
+      {consultations.length > 0 && filteredConsultations.length === 0 && (
+        <p className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+          검색 결과가 없습니다.
+        </p>
+      )}
 
-          return (
-            patientName.includes(searchKeyword) ||
-            consultationText.includes(searchKeyword)
-          );
-        })
-        .sort((a, b) => b.id - a.id)
-        .map((consultation) => (
+      <div className="divide-y divide-slate-200">
+        {filteredConsultations.map((consultation) => (
           <div
             key={consultation.id}
-            className="border-l-4 border-blue-400 pl-4 ml-2 py-4 relative"
+            className="py-4"
           >
-            <div className="absolute -left-[10px] top-6 w-4 h-4 bg-blue-500 rounded-full"></div>
-            <p className="font-bold">
-              {consultation.patient?.name || "환자 정보 없음"}
-            </p>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="font-bold text-slate-900">
+                  {consultation.patient?.name || "환자 정보 없음"}
+                </p>
 
-            <p className="text-sm text-gray-400 mb-2">
-              {new Date(consultation.createdAt).toLocaleString()}
-            </p>
+                <p className="text-sm text-slate-400">
+                  {new Date(consultation.createdAt).toLocaleString()}
+                </p>
+              </div>
+
+              <span
+                className={`shrink-0 rounded-full border px-3 py-1 text-sm font-bold ${getRiskColor(
+                  consultation.aiAnalysis?.riskLevel,
+                )}`}
+              >
+                위험도: {consultation.aiAnalysis?.riskLevel || "분석 없음"}
+              </span>
+            </div>
 
             {editingId === consultation.id ? (
               <div className="mt-2">
                 <textarea
                   value={editText}
                   onChange={(e) => setEditText(e.target.value)}
-                  className="w-full border p-2 rounded"
+                  className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
                 />
 
                 <button
                   onClick={() => updateConsultation(consultation.id)}
-                  className="mt-2 bg-green-500 text-white px-3 py-1 rounded"
+                  className="mt-2 rounded-md bg-slate-800 px-3 py-1.5 text-sm font-medium text-white"
                 >
                   저장
                 </button>
               </div>
             ) : (
-              <p className="mt-2">{consultation.originalText}</p>
+              <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-700">
+                {consultation.originalText}
+              </p>
             )}
 
-            <p className="mt-2 text-blue-600">
+            <p className="mt-3 rounded-md bg-slate-50 p-3 text-sm leading-6 text-slate-600">
               AI 요약: {consultation.summary}
             </p>
 
-            <span
-              className={`mt-2 inline-block rounded-full border px-3 py-1 text-sm font-bold ${getRiskColor(
-                consultation.aiAnalysis?.riskLevel,
-              )}`}
-            >
-              위험도: {consultation.aiAnalysis?.riskLevel || "분석 없음"}
-            </span>
-
-            <p className="mt-2 text-sm text-gray-500">
+            <p className="mt-2 text-xs text-slate-400">
               음성 파일: {consultation.audioPath}
             </p>
 
-            <button
-              onClick={() => setSelectedConsultation(consultation)}
-              className="mt-3 bg-blue-500 text-white px-3 py-1 rounded"
-            >
-              상세 보기
-            </button>
+            <div className="mt-3 flex gap-2">
+              <button
+                onClick={() => setSelectedConsultation(consultation)}
+                className="rounded-md bg-slate-800 px-3 py-1.5 text-sm font-medium text-white"
+              >
+                상세
+              </button>
 
-            <button
-              onClick={() => deleteConsultation(consultation.id)}
-              className="mt-3 ml-2 bg-red-500 text-white px-3 py-1 rounded"
-            >
-              삭제
-            </button>
+              <button
+                onClick={() => {
+                  setEditingId(consultation.id);
+                  setEditText(consultation.originalText);
+                }}
+                className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700"
+              >
+                수정
+              </button>
 
-            <button
-              onClick={() => {
-                setEditingId(consultation.id);
-                setEditText(consultation.originalText);
-              }}
-              className="mt-3 ml-2 bg-yellow-500 text-white px-3 py-1 rounded"
-            >
-              수정
-            </button>
+              <button
+                onClick={() => deleteConsultation(consultation.id)}
+                className="rounded-md border border-slate-300 bg-white px-3 py-1.5 text-sm font-medium text-slate-700"
+              >
+                삭제
+              </button>
+            </div>
 
             {consultation.audioPath?.startsWith("/uploads/") && (
               <audio
@@ -121,7 +145,8 @@ function ConsultationList({
             )}
           </div>
         ))}
-    </div>
+      </div>
+    </section>
   );
 }
 

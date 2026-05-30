@@ -5,27 +5,33 @@ function Dashboard({
   recentConsultations
 }) {
   return (
-    <div className="grid grid-cols-4 gap-4 mb-6">
-      <div className="bg-white rounded-2xl shadow p-5">
-        <p className="text-gray-500">전체 환자 수</p>
-        <p className="text-3xl font-bold">{totalPatients}</p>
+    <div className="mb-6 grid grid-cols-4 gap-6">
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <p className="text-sm font-medium text-slate-500">전체 환자 수</p>
+        <p className="mt-2 text-3xl font-bold text-slate-900">
+          {totalPatients}
+        </p>
       </div>
 
-      <div className="bg-white rounded-2xl shadow p-5">
-        <p className="text-gray-500">전체 상담 수</p>
-        <p className="text-3xl font-bold">{totalConsultations}</p>
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <p className="text-sm font-medium text-slate-500">전체 상담 수</p>
+        <p className="mt-2 text-3xl font-bold text-slate-900">
+          {totalConsultations}
+        </p>
       </div>
 
-      <div className="bg-white rounded-2xl shadow p-5">
-        <p className="text-gray-500">주의 상담 수</p>
-        <p className="text-3xl font-bold text-yellow-600">
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <p className="text-sm font-medium text-slate-500">주의 상담 수</p>
+        <p className="mt-2 text-3xl font-bold text-amber-600">
           {warningConsultations}
         </p>
       </div>
 
-      <div className="bg-white rounded-2xl shadow p-5">
-        <p className="text-gray-500">최근 7일 상담</p>
-        <p className="text-3xl font-bold">{recentConsultations}</p>
+      <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+        <p className="text-sm font-medium text-slate-500">최근 7일 상담</p>
+        <p className="mt-2 text-3xl font-bold text-slate-900">
+          {recentConsultations}
+        </p>
       </div>
     </div>
   )
