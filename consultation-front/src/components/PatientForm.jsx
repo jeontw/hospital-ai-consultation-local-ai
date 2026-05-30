@@ -5,8 +5,56 @@ function PatientForm({
   setName,
   setPhone,
   setBirth,
-  addPatient
+  addPatient,
 }) {
+  const onlyDigits = (value) => value.replace(/\D/g, "");
+
+  const formatPhone = (value) => {
+    const digits = onlyDigits(value).slice(0, 11);
+
+    if (digits.length <= 3) {
+      return digits;
+    }
+
+    if (digits.length <= 7) {
+      return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+    }
+
+    return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+  };
+
+  const formatBirth = (value) => {
+    const digits = onlyDigits(value).slice(0, 8);
+
+    if (digits.length <= 4) {
+      return digits;
+    }
+
+    if (digits.length <= 6) {
+      return `${digits.slice(0, 4)}-${digits.slice(4)}`;
+    }
+
+    return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6)}`;
+  };
+
+  const canSubmitWithEnter =
+    name.trim() &&
+    onlyDigits(phone).length === 11 &&
+    onlyDigits(birth).length === 8;
+
+  const handleKeyDown = (event) => {
+    if (event.key !== "Enter") {
+      return;
+    }
+
+    if (!canSubmitWithEnter) {
+      return;
+    }
+
+    event.preventDefault();
+    addPatient();
+  };
+
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <h2 className="mb-4 border-b border-slate-200 pb-3 text-lg font-bold text-slate-900">
@@ -19,33 +67,45 @@ function PatientForm({
           placeholder="이름"
           value={name}
           onChange={(e) => setName(e.target.value)}
+          onKeyDown={handleKeyDown}
           className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
         />
 
         <input
           type="text"
-          placeholder="전화번호"
+          placeholder="010-2222-2222"
           value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          inputMode="numeric"
+          onChange={(e) => setPhone(formatPhone(e.target.value))}
+          onKeyDown={handleKeyDown}
           className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
         />
 
         <input
-          type="date"
+          type="text"
+          placeholder="yyyy-MM-dd"
           value={birth}
-          onChange={(e) => setBirth(e.target.value)}
+          inputMode="numeric"
+          onChange={(e) => setBirth(formatBirth(e.target.value))}
+          onKeyDown={handleKeyDown}
           className="rounded-md border border-slate-300 px-3 py-2 text-sm"
         />
 
         <button
+          type="button"
           onClick={addPatient}
+          onKeyDown={(e) => {
+            if (e.key === " " || e.key === "Spacebar") {
+              e.preventDefault();
+            }
+          }}
           className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
         >
           등록
         </button>
       </div>
     </section>
-  )
+  );
 }
 
-export default PatientForm
+export default PatientForm;
