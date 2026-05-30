@@ -111,6 +111,26 @@ function App() {
     fetchAppointmentsForConsultation(consultation);
   };
 
+  const selectPatientForView = (patientId) => {
+    setSelectedViewPatientId(patientId);
+    setSelectedPatientId(patientId);
+    setSelectedConsultation(null);
+    setConsultationAppointments([]);
+    setPatientAppointments([]);
+
+    const patient = patients.find(
+      (patient) => String(patient.id) === String(patientId),
+    );
+
+    setSelectedPatient(patient || null);
+
+    if (patientId === "") {
+      fetchConsultations();
+    } else {
+      fetchPatientConsultations(patientId);
+    }
+  };
+
   useEffect(() => {
     setTimeout(() => {
       fetchPatients();
@@ -401,60 +421,11 @@ function App() {
           <PatientList
             patients={patients}
             selectedViewPatientId={selectedViewPatientId}
-            onSelectPatient={(patientId) => {
-              setSelectedViewPatientId(patientId);
-              setSelectedConsultation(null);
-              setConsultationAppointments([]);
-              setPatientAppointments([]);
-
-              const patient = patients.find(
-                (patient) => String(patient.id) === String(patientId),
-              );
-
-              setSelectedPatient(patient || null);
-
-              if (patientId === "") {
-                fetchConsultations();
-              } else {
-                fetchPatientConsultations(patientId);
-              }
-            }}
+            selectedPatientId={selectedPatientId}
+            onSelectPatient={selectPatientForView}
             deletePatient={deletePatient}
             updatePatient={updatePatient}
           />
-
-          <select
-            value={selectedViewPatientId}
-            onChange={(e) => {
-              const patientId = e.target.value;
-
-              setSelectedViewPatientId(patientId);
-              setSelectedConsultation(null);
-              setConsultationAppointments([]);
-              setPatientAppointments([]);
-
-              const patient = patients.find(
-                (patient) => String(patient.id) === String(patientId),
-              );
-
-              setSelectedPatient(patient || null);
-
-              if (patientId === "") {
-                fetchConsultations();
-              } else {
-                fetchPatientConsultations(patientId);
-              }
-            }}
-            className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
-          >
-            <option value="">전체 상담 보기</option>
-
-            {patients.map((patient) => (
-              <option key={patient.id} value={patient.id}>
-                {patient.name}
-              </option>
-            ))}
-          </select>
 
           <ConsultationList
             consultations={consultations}

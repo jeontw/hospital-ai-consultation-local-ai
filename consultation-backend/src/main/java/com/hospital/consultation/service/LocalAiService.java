@@ -6,7 +6,6 @@ import org.springframework.web.client.RestTemplate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
-import java.time.LocalDate;
 import java.util.Map;
 
 @Service
@@ -59,7 +58,9 @@ public class LocalAiService implements AiService {
         당신은 병원 예약 업무를 보조하는 AI입니다.
         진단, 의학적 판단, 치료 권고를 하지 마세요.
         상담 내용에서 실제로 예약 시간이 합의된 경우에만 예약 초안을 작성하세요.
-        오늘 날짜는 %s 입니다. "2주 뒤", "다음 주", "내일" 같은 상대 날짜는 오늘 날짜를 기준으로 계산하세요.
+        날짜 계산은 절대 하지 마세요.
+        "2주 뒤", "내일", "한 달 뒤" 같은 상대 날짜 표현은 계산하지 말고 원문 표현 그대로 dateExpression에 넣으세요.
+        "오전 10시", "오후 3시" 같은 시간 표현은 원문 표현 그대로 timeExpression에 넣으세요.
 
         반드시 아래 JSON 객체 하나만 출력하세요.
         JSON 앞뒤에 설명, 마크다운, 코드블럭을 절대 붙이지 마세요.
@@ -68,6 +69,8 @@ public class LocalAiService implements AiService {
         {
           "appointmentConfirmed": false,
           "appointmentDateTime": null,
+          "dateExpression": "",
+          "timeExpression": "",
           "purpose": "",
           "status": "예정",
           "memo": "",
@@ -83,9 +86,9 @@ public class LocalAiService implements AiService {
         - 상담사가 시간만 제안하고 환자가 동의하지 않았으면 appointmentConfirmed는 false입니다.
         - 예약 관련 대화가 없으면 appointmentConfirmed는 false입니다.
         - 날짜 또는 시간이 불명확하면 appointmentConfirmed는 false입니다.
-        - 예약 시간이 명시되어 있으면 반드시 추출하세요.
-        - appointmentDateTime은 확정된 경우에만 "yyyy-MM-dd'T'HH:mm:ss" 형식으로 작성하세요.
-        - appointmentConfirmed가 true이면 appointmentDateTime은 절대 null이 될 수 없습니다.
+        - 예약 날짜 표현이 명시되어 있으면 반드시 dateExpression에 원문 그대로 추출하세요.
+        - 예약 시간 표현이 명시되어 있으면 반드시 timeExpression에 원문 그대로 추출하세요.
+        - appointmentDateTime은 직접 계산하지 말고 null로 두세요. 명확한 절대 일시가 원문에 그대로 있는 경우에만 fallback 용도로 "yyyy-MM-dd'T'HH:mm:ss" 형식으로 작성할 수 있습니다.
         - appointmentConfirmed가 false이면 appointmentDateTime은 반드시 null입니다.
         - status 기본값은 "예정"입니다.
         - purpose는 상담 문맥을 기반으로 예약 목적만 짧게 작성하세요.
@@ -98,9 +101,10 @@ public class LocalAiService implements AiService {
         상담사: 그럼 2주 뒤 오전 10시로 예약 진행하겠습니다.
 
         위 예시는 상담사의 특정 시간 제안, 환자의 동의, 상담사의 예약 진행 표현이 모두 있으므로 appointmentConfirmed는 반드시 true입니다.
+        이 예시의 dateExpression은 "2주 뒤", timeExpression은 "오전 10시"입니다.
 
         상담 내용:
-        """.formatted(LocalDate.now()) + consultationText;
+        """ + consultationText;
 
         return extractAppointmentDraftJson(callOllama(prompt));
     }
@@ -172,6 +176,8 @@ public class LocalAiService implements AiService {
             {
               "appointmentConfirmed": false,
               "appointmentDateTime": null,
+              "dateExpression": "",
+              "timeExpression": "",
               "purpose": "",
               "status": "예정",
               "memo": "",

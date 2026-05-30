@@ -11,6 +11,10 @@ public class AppointmentDraftDto {
 
     private String appointmentDateTime;
 
+    private String dateExpression;
+
+    private String timeExpression;
+
     private String purpose;
 
     private String status;

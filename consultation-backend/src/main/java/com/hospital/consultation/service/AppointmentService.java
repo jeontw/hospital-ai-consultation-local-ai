@@ -12,8 +12,13 @@ import com.hospital.consultation.repository.PatientRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
+import java.util.Optional;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -78,6 +83,9 @@ public class AppointmentService {
 
             if (!draft.isAppointmentConfirmed()) {
                 draft.setAppointmentDateTime(null);
+            } else {
+                calculateAppointmentDateTime(consultation, draft)
+                        .ifPresent(dateTime -> draft.setAppointmentDateTime(dateTime.toString()));
             }
 
             if (draft.getStatus() == null || draft.getStatus().isBlank()) {
@@ -95,6 +103,92 @@ public class AppointmentService {
             draft.setReason("예약 초안 분석에 실패했습니다.");
             return draft;
         }
+    }
+
+    private Optional<LocalDateTime> calculateAppointmentDateTime(
+            Consultation consultation,
+            AppointmentDraftDto draft
+    ) {
+        LocalDateTime baseDateTime = consultation.getCreatedAt();
+
+        if (baseDateTime == null) {
+            return Optional.empty();
+        }
+
+        Optional<LocalDate> date = calculateDate(baseDateTime.toLocalDate(), draft.getDateExpression());
+        Optional<LocalTime> time = calculateTime(draft.getTimeExpression());
+
+        if (date.isEmpty() || time.isEmpty()) {
+            return Optional.empty();
+        }
+
+        return Optional.of(LocalDateTime.of(date.get(), time.get()));
+    }
+
+    private Optional<LocalDate> calculateDate(LocalDate baseDate, String dateExpression) {
+        if (dateExpression == null || dateExpression.isBlank()) {
+            return Optional.empty();
+        }
+
+        String normalized = dateExpression.replaceAll("\\s+", "");
+
+        if (normalized.contains("내일")) {
+            return Optional.of(baseDate.plusDays(1));
+        }
+
+        if (normalized.contains("모레")) {
+            return Optional.of(baseDate.plusDays(2));
+        }
+
+        Matcher weekMatcher = Pattern.compile("([123])주뒤").matcher(normalized);
+
+        if (weekMatcher.find()) {
+            int weeks = Integer.parseInt(weekMatcher.group(1));
+            return Optional.of(baseDate.plusDays(weeks * 7L));
+        }
+
+        if (normalized.contains("한달뒤")) {
+            return Optional.of(baseDate.plusMonths(1));
+        }
+
+        Matcher monthMatcher = Pattern.compile("([12])달뒤").matcher(normalized);
+
+        if (monthMatcher.find()) {
+            int months = Integer.parseInt(monthMatcher.group(1));
+            return Optional.of(baseDate.plusMonths(months));
+        }
+
+        return Optional.empty();
+    }
+
+    private Optional<LocalTime> calculateTime(String timeExpression) {
+        if (timeExpression == null || timeExpression.isBlank()) {
+            return Optional.empty();
+        }
+
+        String normalized = timeExpression.replaceAll("\\s+", "");
+        Matcher matcher = Pattern.compile("(오전|오후)(\\d{1,2})시").matcher(normalized);
+
+        if (!matcher.find()) {
+            return Optional.empty();
+        }
+
+        String meridiem = matcher.group(1);
+        int hour = Integer.parseInt(matcher.group(2));
+
+        if (hour < 1 || hour > 12) {
+            return Optional.empty();
+        }
+
+        if ("오후".equals(meridiem) && hour < 12) {
+            hour += 12;
+        }
+
+        if ("오전".equals(meridiem) && hour == 12) {
+            hour = 0;
+        }
+
+        return Optional.of(LocalTime.of(hour, 0));
     }
 
     public Appointment updateAppointment(Long appointmentId, AppointmentRequestDto requestDto) {

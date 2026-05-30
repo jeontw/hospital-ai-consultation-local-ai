@@ -3,6 +3,7 @@ import { useState } from "react";
 function PatientList({
   patients,
   selectedViewPatientId,
+  selectedPatientId,
   onSelectPatient,
   deletePatient,
   updatePatient,
@@ -82,7 +83,7 @@ function PatientList({
             onClick={() => onSelectPatient(patient.id)}
             className={`cursor-pointer px-3 py-4 hover:bg-slate-50 ${
               String(selectedViewPatientId) === String(patient.id)
-                ? "bg-slate-100"
+                ? "bg-slate-100 ring-1 ring-inset ring-slate-300"
                 : ""
             }`}
           >
@@ -134,6 +135,11 @@ function PatientList({
                     <p className="text-sm text-slate-400">
                       생년월일: {patient.birth || "없음"}
                     </p>
+                    {String(selectedPatientId) === String(patient.id) && (
+                      <p className="mt-2 text-xs font-medium text-slate-700">
+                        상담 등록 대상
+                      </p>
+                    )}
                   </div>
 
                   <div className="flex shrink-0 gap-2">

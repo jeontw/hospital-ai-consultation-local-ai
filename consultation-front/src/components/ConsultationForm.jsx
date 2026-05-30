@@ -1,7 +1,6 @@
 function ConsultationForm({
   patients,
   selectedPatientId,
-  setSelectedPatientId,
   registrationMode,
   setRegistrationMode,
   setAudioFile,
@@ -12,6 +11,10 @@ function ConsultationForm({
   isLoading,
   loadingMessage,
 }) {
+  const selectedPatient = patients.find(
+    (patient) => String(patient.id) === String(selectedPatientId),
+  );
+
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
       <h2 className="mb-4 border-b border-slate-200 pb-3 text-lg font-bold text-slate-900">
@@ -19,19 +22,15 @@ function ConsultationForm({
       </h2>
 
       <div className="flex flex-col gap-3">
-        <select
-          value={selectedPatientId}
-          onChange={(e) => setSelectedPatientId(e.target.value)}
-          className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-        >
-          <option value="">환자 선택</option>
-
-          {patients.map((patient) => (
-            <option key={patient.id} value={patient.id}>
-              {patient.name} / {patient.phone}
-            </option>
-          ))}
-        </select>
+        {selectedPatient ? (
+          <p className="rounded-md bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
+            상담 등록 대상: {selectedPatient.name} / {selectedPatient.phone}
+          </p>
+        ) : (
+          <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-medium text-slate-500">
+            왼쪽 환자 목록에서 상담 등록할 환자를 선택하세요
+          </p>
+        )}
 
         <div className="grid grid-cols-2 gap-2">
           <button
