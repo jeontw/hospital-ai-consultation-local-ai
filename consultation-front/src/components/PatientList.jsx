@@ -11,6 +11,18 @@ function PatientList({
   const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editBirth, setEditBirth] = useState("");
+  const [searchKeyword, setSearchKeyword] = useState("");
+
+  const normalizedSearchKeyword = searchKeyword.trim().toLowerCase();
+  const filteredPatients = patients.filter((patient) => {
+    if (!normalizedSearchKeyword) {
+      return true;
+    }
+
+    return [patient.name, patient.phone, patient.birth]
+      .map((value) => String(value || "").toLowerCase())
+      .some((value) => value.includes(normalizedSearchKeyword));
+  });
 
   const startEdit = (patient) => {
     setEditingPatientId(patient.id);
@@ -40,6 +52,14 @@ function PatientList({
     <div className="bg-white rounded-2xl shadow p-6 mb-4">
       <h2 className="text-2xl font-bold mb-4">환자 목록</h2>
 
+      <input
+        type="text"
+        value={searchKeyword}
+        onChange={(e) => setSearchKeyword(e.target.value)}
+        className="border p-2 rounded mb-4 w-full"
+        placeholder="이름, 전화번호, 생년월일 검색"
+      />
+
       <button
         onClick={() => onSelectPatient("")}
         className="mb-4 bg-gray-500 text-white px-3 py-1 rounded"
@@ -47,7 +67,11 @@ function PatientList({
         전체 상담 보기
       </button>
 
-      {patients.map((patient) => (
+      {filteredPatients.length === 0 && (
+        <p className="text-gray-400">검색 결과가 없습니다.</p>
+      )}
+
+      {filteredPatients.map((patient) => (
         <div
           key={patient.id}
           onClick={() => onSelectPatient(patient.id)}
