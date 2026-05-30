@@ -6,6 +6,7 @@ import org.springframework.web.client.RestTemplate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 
+import java.time.LocalDate;
 import java.util.Map;
 
 @Service
@@ -58,6 +59,7 @@ public class LocalAiService implements AiService {
         당신은 병원 예약 업무를 보조하는 AI입니다.
         진단, 의학적 판단, 치료 권고를 하지 마세요.
         상담 내용에서 실제로 예약 시간이 합의된 경우에만 예약 초안을 작성하세요.
+        오늘 날짜는 %s 입니다. "2주 뒤", "다음 주", "내일" 같은 상대 날짜는 오늘 날짜를 기준으로 계산하세요.
 
         반드시 아래 JSON 객체 하나만 출력하세요.
         JSON 앞뒤에 설명, 마크다운, 코드블럭을 절대 붙이지 마세요.
@@ -74,18 +76,31 @@ public class LocalAiService implements AiService {
 
         판단 규칙:
         - 환자가 예약 시간에 명확히 동의한 경우만 appointmentConfirmed를 true로 설정하세요.
+        - 아래 3가지 조건이 모두 만족되면 반드시 appointmentConfirmed를 true로 설정하세요.
+          1. 상담사가 특정 날짜 또는 시간을 제안했습니다.
+          2. 환자가 "네", "가능합니다", "괜찮습니다", "알겠습니다", "좋습니다", "그렇게 해주세요" 등으로 동의했습니다.
+          3. 상담사가 "예약 진행하겠습니다", "예약하겠습니다", "예약 완료하겠습니다", "접수하겠습니다", "예약 잡아드리겠습니다" 등 예약 진행 또는 확정 표현을 사용했습니다.
         - 상담사가 시간만 제안하고 환자가 동의하지 않았으면 appointmentConfirmed는 false입니다.
         - 예약 관련 대화가 없으면 appointmentConfirmed는 false입니다.
         - 날짜 또는 시간이 불명확하면 appointmentConfirmed는 false입니다.
+        - 예약 시간이 명시되어 있으면 반드시 추출하세요.
         - appointmentDateTime은 확정된 경우에만 "yyyy-MM-dd'T'HH:mm:ss" 형식으로 작성하세요.
+        - appointmentConfirmed가 true이면 appointmentDateTime은 절대 null이 될 수 없습니다.
         - appointmentConfirmed가 false이면 appointmentDateTime은 반드시 null입니다.
         - status 기본값은 "예정"입니다.
-        - purpose는 예약 목적만 짧게 작성하세요.
+        - purpose는 상담 문맥을 기반으로 예약 목적만 짧게 작성하세요.
         - memo에는 예약 판단에 필요한 근거만 간단히 작성하세요.
-        - reason에는 true/false 판단 이유를 한국어로 작성하세요.
+        - reason에는 왜 예약이 확정되었거나 확정되지 않았다고 판단했는지 한국어로 간단히 작성하세요.
+
+        예시:
+        상담사: 2주 뒤 오전 10시에 다시 검사받으실 수 있을까요?
+        환자: 네 가능합니다.
+        상담사: 그럼 2주 뒤 오전 10시로 예약 진행하겠습니다.
+
+        위 예시는 상담사의 특정 시간 제안, 환자의 동의, 상담사의 예약 진행 표현이 모두 있으므로 appointmentConfirmed는 반드시 true입니다.
 
         상담 내용:
-        """ + consultationText;
+        """.formatted(LocalDate.now()) + consultationText;
 
         return extractAppointmentDraftJson(callOllama(prompt));
     }

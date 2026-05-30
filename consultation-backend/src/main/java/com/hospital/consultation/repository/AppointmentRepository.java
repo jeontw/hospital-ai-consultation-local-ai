@@ -10,4 +10,6 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     List<Appointment> findByPatientId(Long patientId);
 
     List<Appointment> findByConsultationId(Long consultationId);
+
+    void deleteByConsultationId(Long consultationId);
 }

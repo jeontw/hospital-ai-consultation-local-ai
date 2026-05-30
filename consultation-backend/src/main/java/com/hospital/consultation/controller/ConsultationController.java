@@ -7,13 +7,16 @@ import com.hospital.consultation.entity.AiAnalysis;
 import com.hospital.consultation.entity.Consultation;
 import com.hospital.consultation.entity.Patient;
 import com.hospital.consultation.repository.AiAnalysisRepository;
+import com.hospital.consultation.repository.AppointmentRepository;
 import com.hospital.consultation.repository.ConsultationRepository;
 import com.hospital.consultation.repository.PatientRepository;
 import com.hospital.consultation.service.LocalWhisperService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.server.ResponseStatusException;
 import com.hospital.consultation.service.AudioConvertService;
 import com.hospital.consultation.service.AiService;
 
@@ -30,6 +33,7 @@ public class ConsultationController {
     private final AiService aiService;
     private final LocalWhisperService localWhisperService;
     private final AiAnalysisRepository aiAnalysisRepository;
+    private final AppointmentRepository appointmentRepository;
     private final ObjectMapper objectMapper;
     private final AudioConvertService audioConvertService;
 
@@ -42,6 +46,10 @@ public class ConsultationController {
                 .orElseThrow(() -> new RuntimeException("환자를 찾을 수 없습니다."));
 
         String originalText = requestDto.getOriginalText();
+
+        if (originalText == null || originalText.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "상담 내용은 비어 있을 수 없습니다.");
+        }
 
         String speakerText =
                 aiService.separateSpeakers(originalText);
@@ -292,6 +300,8 @@ public class ConsultationController {
                 System.out.println("음성 파일 삭제 완료: " + fullPath);
             }
         }
+
+        appointmentRepository.deleteByConsultationId(consultationId);
 
         aiAnalysisRepository.deleteByConsultationId(consultationId);
 

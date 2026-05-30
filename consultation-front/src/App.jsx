@@ -9,6 +9,7 @@ import {
 import {
   getConsultations,
   getConsultationsByPatient,
+  createTextConsultation,
   uploadConsultationAudio,
   deleteConsultationById,
   updateConsultationById,
@@ -38,6 +39,8 @@ function App() {
 
   const [selectedPatientId, setSelectedPatientId] = useState("");
   const [audioFile, setAudioFile] = useState(null);
+  const [registrationMode, setRegistrationMode] = useState("audio");
+  const [consultationText, setConsultationText] = useState("");
   const [selectedViewPatientId, setSelectedViewPatientId] = useState("");
   const [searchKeyword, setSearchKeyword] = useState("");
   const [editingId, setEditingId] = useState(null);
@@ -178,27 +181,42 @@ function App() {
     }
   };
   const addConsultation = async () => {
-    setIsLoading(true);
-    setLoadingMessage("음성 파일 업로드 중...");
     if (!selectedPatientId) {
       alert("환자를 선택하세요");
       return;
     }
 
-    if (!audioFile) {
+    if (registrationMode === "audio" && !audioFile) {
       alert("음성 파일을 선택하세요");
       return;
     }
 
-    try {
-      const formData = new FormData();
-      formData.append("file", audioFile);
-      setLoadingMessage("음성 변환 및 STT 분석 중...");
+    if (registrationMode === "text" && !consultationText.trim()) {
+      alert("상담 내용을 입력하세요");
+      return;
+    }
 
-      const response = await uploadConsultationAudio(
-        selectedPatientId,
-        formData,
-      );
+    setIsLoading(true);
+
+    try {
+      let response;
+
+      if (registrationMode === "audio") {
+        setLoadingMessage("음성 파일 업로드 중...");
+
+        const formData = new FormData();
+        formData.append("file", audioFile);
+        setLoadingMessage("음성 변환 및 STT 분석 중...");
+
+        response = await uploadConsultationAudio(selectedPatientId, formData);
+      } else {
+        setLoadingMessage("상담 내용 AI 분석 및 저장 중...");
+
+        response = await createTextConsultation(selectedPatientId, {
+          originalText: consultationText.trim(),
+          audioPath: null,
+        });
+      }
 
       setLoadingMessage("AI 상담 내용 분석 및 저장 중...");
 
@@ -208,6 +226,7 @@ function App() {
 
       setSelectedPatientId("");
       setAudioFile(null);
+      setConsultationText("");
 
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -356,7 +375,11 @@ function App() {
         patients={patients}
         selectedPatientId={selectedPatientId}
         setSelectedPatientId={setSelectedPatientId}
+        registrationMode={registrationMode}
+        setRegistrationMode={setRegistrationMode}
         setAudioFile={setAudioFile}
+        consultationText={consultationText}
+        setConsultationText={setConsultationText}
         addConsultation={addConsultation}
         fileInputRef={fileInputRef}
         isLoading={isLoading}

@@ -14,6 +14,10 @@ export const uploadConsultationAudio = (patientId, formData) => {
   return axios.post(`${BASE_URL}/consultations/upload/${patientId}`, formData);
 };
 
+export const createTextConsultation = (patientId, data) => {
+  return axios.post(`${BASE_URL}/consultations/${patientId}`, data);
+};
+
 export const deleteConsultationById = (consultationId) => {
   return axios.delete(`${BASE_URL}/consultations/${consultationId}`);
 };
