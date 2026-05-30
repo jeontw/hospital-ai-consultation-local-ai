@@ -17,8 +17,11 @@ import {
 import {
   createAppointment,
   createAppointmentDraft,
+  deleteAppointmentById,
+  getAppointments,
   getAppointmentsByConsultation,
   getAppointmentsByPatient,
+  updateAppointmentStatus,
 } from "./api/appointmentApi";
 
 import Dashboard from "./components/Dashboard";
@@ -28,6 +31,9 @@ import PatientList from "./components/PatientList";
 import ConsultationDetail from "./components/ConsultationDetail";
 import ConsultationList from "./components/ConsultationList";
 import PatientInsight from "./components/PatientInsight";
+import AppointmentForm from "./components/AppointmentForm";
+import AppointmentList from "./components/AppointmentList";
+import AppointmentCalendar from "./components/AppointmentCalendar";
 
 function App() {
   const [patients, setPatients] = useState([]);
@@ -51,6 +57,17 @@ function App() {
   const [loadingMessage, setLoadingMessage] = useState("");
   const [consultationAppointments, setConsultationAppointments] = useState([]);
   const [patientAppointments, setPatientAppointments] = useState([]);
+  const [allAppointments, setAllAppointments] = useState([]);
+  const [selectedPatientAppointments, setSelectedPatientAppointments] = useState([]);
+  const [isAppointmentSaving, setIsAppointmentSaving] = useState(false);
+  const [appointmentDraft, setAppointmentDraft] = useState({
+    appointmentDate: "",
+    dateText: "",
+    timeText: "",
+    memo: "",
+    status: "예약됨",
+  });
+  const [viewMode, setViewMode] = useState("list");
 
   const fileInputRef = useRef(null);
 
@@ -69,16 +86,20 @@ function App() {
       const response = await getConsultations();
       console.log("상담 목록:", response.data);
       setConsultations(response.data);
+      return response.data;
     } catch (error) {
       console.error("상담 조회 실패:", error);
+      return [];
     }
   };
   const fetchPatientConsultations = async (patientId) => {
     try {
       const response = await getConsultationsByPatient(patientId);
       setConsultations(response.data);
+      return response.data;
     } catch (error) {
       console.error("환자 상담 조회 실패:", error);
+      return [];
     }
   };
   const fetchAppointmentsForConsultation = async (consultation) => {
@@ -106,17 +127,89 @@ function App() {
       console.error("예약 목록 조회 실패:", error);
     }
   };
-  const selectConsultation = (consultation) => {
-    setSelectedConsultation(consultation);
-    fetchAppointmentsForConsultation(consultation);
+  const fetchAllAppointments = async () => {
+    try {
+      const response = await getAppointments();
+      setAllAppointments(response.data);
+      return response.data;
+    } catch (error) {
+      console.error("예약 목록 조회 실패:", error);
+      return [];
+    }
   };
 
-  const selectPatientForView = (patientId) => {
+  const fetchSelectedPatientAppointments = async (patientId) => {
+    if (!patientId) {
+      setSelectedPatientAppointments([]);
+      return [];
+    }
+
+    try {
+      const response = await getAppointmentsByPatient(patientId);
+      setSelectedPatientAppointments(response.data);
+      return response.data;
+    } catch (error) {
+      console.error("환자 예약 목록 조회 실패:", error);
+      return [];
+    }
+  };
+  const clearAppointmentDraft = () => {
+    setAppointmentDraft({
+      appointmentDate: "",
+      dateText: "",
+      timeText: "",
+      memo: "",
+      status: "예약됨",
+    });
+  };
+
+  const applyAppointmentDraft = (draft) => {
+    if (!draft) {
+      return;
+    }
+
+    setAppointmentDraft({
+      appointmentDate: draft.appointmentDate || draft.appointmentDateTime || "",
+      dateText: draft.dateText || draft.dateExpression || "",
+      timeText: draft.timeText || draft.timeExpression || "",
+      memo: draft.memo || "",
+      status: draft.status || "예약됨",
+    });
+  };
+
+  const handleGenerateAppointmentDraft = async () => {
+    const draft = await generateAppointmentDraft();
+
+    if (!draft) {
+      return null;
+    }
+
+    if (!draft.needReservation && !draft.appointmentConfirmed) {
+      alert("상담 내용에서 예약 초안을 찾지 못했습니다.");
+      return null;
+    }
+
+    applyAppointmentDraft(draft);
+    return draft;
+  };
+  const selectConsultation = (consultation) => {
+    setSelectedConsultation(consultation);
+    setSelectedPatient(consultation?.patient || null);
+    setViewMode("detail");
+    fetchAppointmentsForConsultation(consultation);
+    fetchSelectedPatientAppointments(consultation?.patient?.id);
+    clearAppointmentDraft();
+  };
+
+  const selectPatientForView = async (patientId) => {
     setSelectedViewPatientId(patientId);
     setSelectedPatientId(patientId);
     setSelectedConsultation(null);
+    setViewMode("list");
     setConsultationAppointments([]);
     setPatientAppointments([]);
+    setSelectedPatientAppointments([]);
+    clearAppointmentDraft();
 
     const patient = patients.find(
       (patient) => String(patient.id) === String(patientId),
@@ -128,6 +221,7 @@ function App() {
       fetchConsultations();
     } else {
       fetchPatientConsultations(patientId);
+      fetchSelectedPatientAppointments(patientId);
     }
   };
 
@@ -135,6 +229,7 @@ function App() {
     setTimeout(() => {
       fetchPatients();
       fetchConsultations();
+      fetchAllAppointments();
     }, 0);
   }, []);
 
@@ -178,9 +273,15 @@ function App() {
 
       setSelectedViewPatientId("");
       setSelectedConsultation(null);
+      setSelectedPatient(null);
+      setSelectedPatientId("");
+      setViewMode("list");
+      setSelectedPatientAppointments([]);
+      clearAppointmentDraft();
 
       fetchPatients();
       fetchConsultations();
+      fetchAllAppointments();
     } catch (error) {
       console.error("환자 삭제 실패:", error);
       alert(
@@ -244,7 +345,6 @@ function App() {
 
       selectConsultation(response.data);
 
-      setSelectedPatientId("");
       setAudioFile(null);
       setConsultationText("");
 
@@ -252,7 +352,11 @@ function App() {
         fileInputRef.current.value = "";
       }
 
-      fetchConsultations();
+      if (selectedViewPatientId) {
+        fetchPatientConsultations(selectedViewPatientId);
+      } else {
+        fetchConsultations();
+      }
     } catch (error) {
       console.error("상담 등록 실패:", error);
       alert("상담 등록 실패");
@@ -271,7 +375,18 @@ function App() {
     try {
       await deleteConsultationById(consultationId);
       alert("상담 삭제 완료");
-      fetchConsultations();
+
+      if (selectedConsultation?.id === consultationId) {
+        setSelectedConsultation(null);
+        setViewMode("list");
+        setConsultationAppointments([]);
+      }
+
+      if (selectedViewPatientId) {
+        fetchPatientConsultations(selectedViewPatientId);
+      } else {
+        fetchConsultations();
+      }
     } catch (error) {
       console.error("상담 삭제 실패:", error);
       alert("상담 삭제 실패");
@@ -288,39 +403,14 @@ function App() {
       setEditingId(null);
       setEditText("");
 
-      fetchConsultations();
+      if (selectedViewPatientId) {
+        fetchPatientConsultations(selectedViewPatientId);
+      } else {
+        fetchConsultations();
+      }
     } catch (error) {
       console.error("상담 수정 실패:", error);
       alert("상담 수정 실패");
-    }
-  };
-  const addAppointment = async (appointment) => {
-    if (!selectedConsultation) {
-      alert("상담을 먼저 선택하세요.");
-      return;
-    }
-
-    const patientId = selectedConsultation.patient?.id;
-
-    if (!patientId) {
-      alert("선택된 상담의 환자 정보가 없습니다.");
-      return;
-    }
-
-    try {
-      await createAppointment({
-        ...appointment,
-        patientId,
-        consultationId: selectedConsultation.id,
-      });
-
-      alert("예약 등록 성공");
-      fetchAppointmentsForConsultation(selectedConsultation);
-      return true;
-    } catch (error) {
-      console.error("예약 등록 실패:", error);
-      alert("예약 등록 실패");
-      return false;
     }
   };
   const generateAppointmentDraft = async () => {
@@ -336,6 +426,73 @@ function App() {
       console.error("AI 예약 초안 생성 실패:", error);
       alert("AI 예약 초안 생성 실패");
       return null;
+    }
+  };
+  const addPatientAppointment = async (event) => {
+    event.preventDefault();
+
+    if (!selectedPatient) {
+      alert("환자를 선택하세요.");
+      return false;
+    }
+
+    if (!appointmentDraft.appointmentDate) {
+      alert("예약 일시를 입력하세요.");
+      return false;
+    }
+
+    setIsAppointmentSaving(true);
+
+    try {
+      await createAppointment({
+        patientId: selectedPatient.id,
+        consultationId: selectedConsultation?.id || null,
+        appointmentDate: appointmentDraft.appointmentDate,
+        status: appointmentDraft.status || "예약됨",
+        memo: appointmentDraft.memo,
+      });
+      alert("예약 등록 성공");
+      fetchAllAppointments();
+      fetchSelectedPatientAppointments(selectedPatient.id);
+      if (selectedConsultation) {
+        fetchAppointmentsForConsultation(selectedConsultation);
+      }
+      clearAppointmentDraft();
+      return true;
+    } catch (error) {
+      console.error("예약 등록 실패:", error);
+      alert(error.response?.data?.message || "예약 등록 실패");
+      return false;
+    } finally {
+      setIsAppointmentSaving(false);
+    }
+  };
+
+  const changePatientAppointmentStatus = async (appointmentId, status) => {
+    try {
+      await updateAppointmentStatus(appointmentId, status);
+      fetchAllAppointments();
+      fetchSelectedPatientAppointments(selectedPatient?.id);
+    } catch (error) {
+      console.error("예약 상태 변경 실패:", error);
+      alert(error.response?.data?.message || "예약 상태 변경 실패");
+    }
+  };
+
+  const removePatientAppointment = async (appointmentId) => {
+    const confirmDelete = confirm("예약을 삭제할까요?");
+
+    if (!confirmDelete) {
+      return;
+    }
+
+    try {
+      await deleteAppointmentById(appointmentId);
+      fetchAllAppointments();
+      fetchSelectedPatientAppointments(selectedPatient?.id);
+    } catch (error) {
+      console.error("예약 삭제 실패:", error);
+      alert("예약 삭제 실패");
     }
   };
   const getRiskColor = (riskLevel) => {
@@ -358,7 +515,9 @@ function App() {
   const totalConsultations = consultations.length;
 
   const warningConsultations = consultations.filter(
-    (consultation) => consultation.aiAnalysis?.riskLevel === "주의",
+    (consultation) =>
+      consultation.aiAnalysis?.riskLevel === "주의" ||
+      consultation.aiAnalysis?.riskLevel === "MEDIUM",
   ).length;
 
   const recentConsultations = consultations.filter((consultation) => {
@@ -372,12 +531,12 @@ function App() {
   }).length;
 
   return (
-    <div className="min-h-screen bg-slate-100 p-8 text-slate-900">
-      <div className="mb-6 border-b border-slate-200 pb-5">
-        <h1 className="text-3xl font-bold tracking-tight">
+    <div className="min-h-screen bg-slate-100 p-4 text-slate-900">
+      <div className="mb-3 border-b border-slate-200 pb-3">
+        <h1 className="text-2xl font-bold tracking-tight">
           병원 상담 관리 시스템
         </h1>
-        <p className="mt-1 text-sm text-slate-500">
+        <p className="mt-0.5 text-base text-slate-500">
           환자 상담 기록, AI 분석, 예약 정보를 한 화면에서 관리합니다.
         </p>
       </div>
@@ -389,35 +548,12 @@ function App() {
         recentConsultations={recentConsultations}
       />
 
-      <div className="mb-6 grid grid-cols-2 gap-6">
-        <PatientForm
-          name={name}
-          phone={phone}
-          birth={birth}
-          setName={setName}
-          setPhone={setPhone}
-          setBirth={setBirth}
-          addPatient={addPatient}
-        />
+      <section className="mb-3">
+        <h2 className="mb-2 text-lg font-bold text-slate-700">
+          환자 업무 영역
+        </h2>
 
-        <ConsultationForm
-          patients={patients}
-          selectedPatientId={selectedPatientId}
-          setSelectedPatientId={setSelectedPatientId}
-          registrationMode={registrationMode}
-          setRegistrationMode={setRegistrationMode}
-          setAudioFile={setAudioFile}
-          consultationText={consultationText}
-          setConsultationText={setConsultationText}
-          addConsultation={addConsultation}
-          fileInputRef={fileInputRef}
-          isLoading={isLoading}
-          loadingMessage={loadingMessage}
-        />
-      </div>
-
-      <div className="grid grid-cols-[minmax(420px,1fr)_minmax(520px,1.25fr)] gap-6">
-        <div className="space-y-6">
+        <div className="grid grid-cols-[minmax(520px,1fr)_minmax(520px,0.95fr)] gap-3">
           <PatientList
             patients={patients}
             selectedViewPatientId={selectedViewPatientId}
@@ -427,44 +563,118 @@ function App() {
             updatePatient={updatePatient}
           />
 
-          <ConsultationList
-            consultations={consultations}
-            searchKeyword={searchKeyword}
-            setSearchKeyword={setSearchKeyword}
-            editingId={editingId}
-            editText={editText}
-            setEditText={setEditText}
-            updateConsultation={updateConsultation}
-            deleteConsultation={deleteConsultation}
-            setEditingId={setEditingId}
-            setSelectedConsultation={selectConsultation}
-            getRiskColor={getRiskColor}
-          />
-        </div>
+          <div className="space-y-3">
+            <PatientForm
+              name={name}
+              phone={phone}
+              birth={birth}
+              setName={setName}
+              setPhone={setPhone}
+              setBirth={setBirth}
+              addPatient={addPatient}
+              compact
+            />
 
-        <div className="space-y-6">
+            <ConsultationForm
+              patients={patients}
+              selectedPatientId={selectedPatientId}
+              setSelectedPatientId={setSelectedPatientId}
+              registrationMode={registrationMode}
+              setRegistrationMode={setRegistrationMode}
+              audioFile={audioFile}
+              setAudioFile={setAudioFile}
+              consultationText={consultationText}
+              setConsultationText={setConsultationText}
+              addConsultation={addConsultation}
+              fileInputRef={fileInputRef}
+              isLoading={isLoading}
+              loadingMessage={loadingMessage}
+            />
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="mb-2 text-lg font-bold text-slate-700">
+          선택 환자 업무 영역
+        </h2>
+
+        <div className="grid grid-cols-[minmax(520px,1fr)_minmax(640px,1.25fr)] gap-3">
+          {viewMode === "detail" && selectedConsultation ? (
+            <ConsultationDetail
+              key={selectedConsultation.id}
+              selectedConsultation={selectedConsultation}
+              getRiskColor={getRiskColor}
+              onGenerateAppointmentDraft={handleGenerateAppointmentDraft}
+              onBackToList={() => setViewMode("list")}
+              onOpenInsight={(patient) => {
+                setSelectedPatient(patient);
+                setSelectedViewPatientId(patient.id);
+                setSelectedPatientId(patient.id);
+                fetchPatientConsultations(patient.id);
+                fetchSelectedPatientAppointments(patient.id);
+                clearAppointmentDraft();
+              }}
+            />
+          ) : (
+            <ConsultationList
+              consultations={consultations}
+              searchKeyword={searchKeyword}
+              setSearchKeyword={setSearchKeyword}
+              editingId={editingId}
+              editText={editText}
+              setEditText={setEditText}
+              updateConsultation={updateConsultation}
+              deleteConsultation={deleteConsultation}
+              setEditingId={setEditingId}
+              setSelectedConsultation={selectConsultation}
+              getRiskColor={getRiskColor}
+            />
+          )}
+
           <PatientInsight
             selectedPatient={selectedPatient}
             consultations={consultations}
             getRiskColor={getRiskColor}
           />
-
-          <ConsultationDetail
-            key={selectedConsultation?.id || "empty-consultation"}
-            selectedConsultation={selectedConsultation}
-            getRiskColor={getRiskColor}
-            addAppointment={addAppointment}
-            generateAppointmentDraft={generateAppointmentDraft}
-            consultationAppointments={consultationAppointments}
-            patientAppointments={patientAppointments}
-            onOpenInsight={(patient) => {
-              setSelectedPatient(patient);
-              setSelectedViewPatientId(patient.id);
-              fetchPatientConsultations(patient.id);
-            }}
-          />
         </div>
-      </div>
+      </section>
+
+      <section className="mt-3">
+        <h2 className="mb-2 text-lg font-bold text-slate-700">
+          예약 관리
+        </h2>
+        <p className="mb-2 text-sm text-slate-500">
+          선택 상담 예약 {consultationAppointments.length}건 / 환자 예약 {patientAppointments.length}건
+        </p>
+
+        <div className="grid grid-cols-[minmax(420px,0.8fr)_minmax(560px,1.2fr)] gap-3">
+          <div className="space-y-3">
+            <AppointmentForm
+              selectedPatient={selectedPatient}
+              selectedConsultation={selectedConsultation}
+              draft={appointmentDraft}
+              onChangeDraft={(field, value) => {
+                setAppointmentDraft((current) => ({
+                  ...current,
+                  [field]: value,
+                }));
+              }}
+              onCreateAppointment={addPatientAppointment}
+              isSaving={isAppointmentSaving}
+            />
+
+            <AppointmentList
+              selectedPatient={selectedPatient}
+              appointments={selectedPatientAppointments}
+              onUpdateStatus={changePatientAppointmentStatus}
+              onDeleteAppointment={removePatientAppointment}
+            />
+          </div>
+
+          <AppointmentCalendar appointments={allAppointments} />
+        </div>
+      </section>
     </div>
   );
 }

@@ -26,6 +26,12 @@ export const updateAppointmentById = (appointmentId, appointment) => {
   return axios.put(`${BASE_URL}/appointments/${appointmentId}`, appointment);
 };
 
+export const updateAppointmentStatus = (appointmentId, status) => {
+  return axios.patch(`${BASE_URL}/appointments/${appointmentId}/status`, {
+    status,
+  });
+};
+
 export const deleteAppointmentById = (appointmentId) => {
   return axios.delete(`${BASE_URL}/appointments/${appointmentId}`);
 };

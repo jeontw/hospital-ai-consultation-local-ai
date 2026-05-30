@@ -1,1 +1,32 @@
 @import "tailwindcss";
+
+.appointment-calendar .fc {
+  font-size: 1rem;
+}
+
+.appointment-calendar .fc-toolbar-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.appointment-calendar .fc-button {
+  background-color: #1e293b;
+  border-color: #1e293b;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.appointment-calendar .appointment-reserved {
+  background-color: #2563eb;
+  border-color: #2563eb;
+}
+
+.appointment-calendar .appointment-completed {
+  background-color: #16a34a;
+  border-color: #16a34a;
+}
+
+.appointment-calendar .appointment-canceled {
+  background-color: #64748b;
+  border-color: #64748b;
+}

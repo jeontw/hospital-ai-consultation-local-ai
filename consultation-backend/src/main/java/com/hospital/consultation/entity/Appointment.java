@@ -1,6 +1,7 @@
 package com.hospital.consultation.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -36,4 +37,14 @@ public class Appointment {
     private String memo;
 
     private LocalDateTime createdAt;
+
+    @JsonProperty("appointmentDate")
+    public LocalDateTime getAppointmentDate() {
+        return appointmentDateTime;
+    }
+
+    @JsonProperty("appointmentDate")
+    public void setAppointmentDate(LocalDateTime appointmentDate) {
+        this.appointmentDateTime = appointmentDate;
+    }
 }

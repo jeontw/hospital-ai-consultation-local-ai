@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -47,6 +48,14 @@ public class AppointmentController {
             @RequestBody AppointmentRequestDto requestDto
     ) {
         return appointmentService.updateAppointment(appointmentId, requestDto);
+    }
+
+    @PatchMapping("/{appointmentId}/status")
+    public Appointment updateAppointmentStatus(
+            @PathVariable Long appointmentId,
+            @RequestBody Map<String, String> request
+    ) {
+        return appointmentService.updateAppointmentStatus(appointmentId, request.get("status"));
     }
 
     @DeleteMapping("/{appointmentId}")

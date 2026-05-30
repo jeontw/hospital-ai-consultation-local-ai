@@ -43,11 +43,7 @@ function PatientForm({
     onlyDigits(birth).length === 8;
 
   const handleKeyDown = (event) => {
-    if (event.key !== "Enter") {
-      return;
-    }
-
-    if (!canSubmitWithEnter) {
+    if (event.key !== "Enter" || !canSubmitWithEnter) {
       return;
     }
 
@@ -56,19 +52,19 @@ function PatientForm({
   };
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
-      <h2 className="mb-4 border-b border-slate-200 pb-3 text-lg font-bold text-slate-900">
-        환자 등록
-      </h2>
+    <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="mb-2 flex items-center justify-between">
+        <h2 className="text-lg font-bold text-slate-900">환자 등록</h2>
+      </div>
 
-      <div className="grid grid-cols-[1fr_1fr_150px_auto] gap-3">
+      <div className="grid grid-cols-[1fr_1fr_150px_78px] gap-2">
         <input
           type="text"
           placeholder="이름"
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={handleKeyDown}
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className="h-9 w-full rounded-md border border-slate-300 px-3 text-base"
         />
 
         <input
@@ -78,7 +74,7 @@ function PatientForm({
           inputMode="numeric"
           onChange={(e) => setPhone(formatPhone(e.target.value))}
           onKeyDown={handleKeyDown}
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className="h-9 w-full rounded-md border border-slate-300 px-3 text-base"
         />
 
         <input
@@ -88,7 +84,7 @@ function PatientForm({
           inputMode="numeric"
           onChange={(e) => setBirth(formatBirth(e.target.value))}
           onKeyDown={handleKeyDown}
-          className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+          className="h-9 rounded-md border border-slate-300 px-3 text-base"
         />
 
         <button
@@ -99,7 +95,7 @@ function PatientForm({
               e.preventDefault();
             }
           }}
-          className="rounded-md bg-slate-800 px-4 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+          className="h-9 rounded-md bg-slate-800 px-3 text-base font-semibold text-white hover:bg-slate-700"
         >
           등록
         </button>
