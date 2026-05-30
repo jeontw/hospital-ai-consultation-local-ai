@@ -7,4 +7,6 @@ public interface AiService {
     String analyze(String text);
 
     String separateSpeakers(String text);
+
+    String extractAppointmentDraft(String consultationText);
 }

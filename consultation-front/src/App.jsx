@@ -13,6 +13,12 @@ import {
   deleteConsultationById,
   updateConsultationById,
 } from "./api/consultationApi";
+import {
+  createAppointment,
+  createAppointmentDraft,
+  getAppointmentsByConsultation,
+  getAppointmentsByPatient,
+} from "./api/appointmentApi";
 
 import Dashboard from "./components/Dashboard";
 import PatientForm from "./components/PatientForm";
@@ -40,6 +46,8 @@ function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [loadingMessage, setLoadingMessage] = useState("");
+  const [consultationAppointments, setConsultationAppointments] = useState([]);
+  const [patientAppointments, setPatientAppointments] = useState([]);
 
   const fileInputRef = useRef(null);
 
@@ -70,10 +78,41 @@ function App() {
       console.error("환자 상담 조회 실패:", error);
     }
   };
+  const fetchAppointmentsForConsultation = async (consultation) => {
+    if (!consultation) {
+      setConsultationAppointments([]);
+      setPatientAppointments([]);
+      return;
+    }
+
+    try {
+      const consultationResponse = await getAppointmentsByConsultation(
+        consultation.id,
+      );
+      setConsultationAppointments(consultationResponse.data);
+
+      const patientId = consultation.patient?.id;
+
+      if (patientId) {
+        const patientResponse = await getAppointmentsByPatient(patientId);
+        setPatientAppointments(patientResponse.data);
+      } else {
+        setPatientAppointments([]);
+      }
+    } catch (error) {
+      console.error("예약 목록 조회 실패:", error);
+    }
+  };
+  const selectConsultation = (consultation) => {
+    setSelectedConsultation(consultation);
+    fetchAppointmentsForConsultation(consultation);
+  };
 
   useEffect(() => {
-    fetchPatients();
-    fetchConsultations();
+    setTimeout(() => {
+      fetchPatients();
+      fetchConsultations();
+    }, 0);
   }, []);
 
   const addPatient = async () => {
@@ -165,7 +204,7 @@ function App() {
 
       alert("상담 등록 성공");
 
-      setSelectedConsultation(response.data);
+      selectConsultation(response.data);
 
       setSelectedPatientId("");
       setAudioFile(null);
@@ -214,6 +253,50 @@ function App() {
     } catch (error) {
       console.error("상담 수정 실패:", error);
       alert("상담 수정 실패");
+    }
+  };
+  const addAppointment = async (appointment) => {
+    if (!selectedConsultation) {
+      alert("상담을 먼저 선택하세요.");
+      return;
+    }
+
+    const patientId = selectedConsultation.patient?.id;
+
+    if (!patientId) {
+      alert("선택된 상담의 환자 정보가 없습니다.");
+      return;
+    }
+
+    try {
+      await createAppointment({
+        ...appointment,
+        patientId,
+        consultationId: selectedConsultation.id,
+      });
+
+      alert("예약 등록 성공");
+      fetchAppointmentsForConsultation(selectedConsultation);
+      return true;
+    } catch (error) {
+      console.error("예약 등록 실패:", error);
+      alert("예약 등록 실패");
+      return false;
+    }
+  };
+  const generateAppointmentDraft = async () => {
+    if (!selectedConsultation) {
+      alert("상담을 먼저 선택하세요.");
+      return null;
+    }
+
+    try {
+      const response = await createAppointmentDraft(selectedConsultation.id);
+      return response.data;
+    } catch (error) {
+      console.error("AI 예약 초안 생성 실패:", error);
+      alert("AI 예약 초안 생성 실패");
+      return null;
     }
   };
   const getRiskColor = (riskLevel) => {
@@ -288,6 +371,8 @@ function App() {
             onSelectPatient={(patientId) => {
               setSelectedViewPatientId(patientId);
               setSelectedConsultation(null);
+              setConsultationAppointments([]);
+              setPatientAppointments([]);
 
               const patient = patients.find(
                 (patient) => String(patient.id) === String(patientId),
@@ -312,6 +397,8 @@ function App() {
 
               setSelectedViewPatientId(patientId);
               setSelectedConsultation(null);
+              setConsultationAppointments([]);
+              setPatientAppointments([]);
 
               const patient = patients.find(
                 (patient) => String(patient.id) === String(patientId),
@@ -346,7 +433,7 @@ function App() {
             updateConsultation={updateConsultation}
             deleteConsultation={deleteConsultation}
             setEditingId={setEditingId}
-            setSelectedConsultation={setSelectedConsultation}
+            setSelectedConsultation={selectConsultation}
             getRiskColor={getRiskColor}
           />
         </div>
@@ -359,8 +446,13 @@ function App() {
           />
 
           <ConsultationDetail
+            key={selectedConsultation?.id || "empty-consultation"}
             selectedConsultation={selectedConsultation}
             getRiskColor={getRiskColor}
+            addAppointment={addAppointment}
+            generateAppointmentDraft={generateAppointmentDraft}
+            consultationAppointments={consultationAppointments}
+            patientAppointments={patientAppointments}
             onOpenInsight={(patient) => {
               setSelectedPatient(patient);
               setSelectedViewPatientId(patient.id);
