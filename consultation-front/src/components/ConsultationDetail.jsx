@@ -33,6 +33,14 @@ function ConsultationDetail({
       : `http://localhost:8080${audioPath.startsWith("/") ? audioPath : `/${audioPath}`}`
     : "";
 
+  const openPatientInsight = () => {
+    if (!selectedConsultation.patient) {
+      return;
+    }
+
+    onOpenInsight(selectedConsultation.patient);
+  };
+
   const submitAppointment = async (event) => {
     event.preventDefault();
 
@@ -156,10 +164,11 @@ function ConsultationDetail({
         </div>
 
         <button
-          onClick={() => onOpenInsight(selectedConsultation.patient)}
-          className="bg-purple-500 text-white px-3 py-1 rounded"
+          onClick={openPatientInsight}
+          disabled={!selectedConsultation.patient}
+          className="bg-purple-500 text-white px-3 py-1 rounded disabled:bg-gray-300"
         >
-          이 환자 AI 인사이트 보기
+          AI 인사이트 보기
         </button>
 
         <div>
