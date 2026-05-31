@@ -27,6 +27,10 @@ public class Appointment {
     @JsonIgnoreProperties({"patient", "aiAnalysis"})
     private Consultation consultation;
 
+    @ManyToOne
+    @JoinColumn(name = "doctor_id")
+    private Doctor doctor;
+
     private LocalDateTime appointmentDateTime;
 
     private String purpose;

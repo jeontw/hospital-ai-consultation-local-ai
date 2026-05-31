@@ -9,6 +9,15 @@ function AppointmentList({
       new Date(a.appointmentDate || a.appointmentDateTime || 0) -
       new Date(b.appointmentDate || b.appointmentDateTime || 0),
   );
+  const getDoctorLabel = (doctor) => {
+    if (!doctor?.name) {
+      return "미지정";
+    }
+
+    return doctor.specialty
+      ? `${doctor.name} (${doctor.specialty})`
+      : doctor.name;
+  };
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -24,8 +33,9 @@ function AppointmentList({
         </p>
       ) : (
         <div className="overflow-hidden rounded-md border border-slate-200">
-          <div className="grid h-9 grid-cols-[180px_90px_1fr_190px] items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-500">
+          <div className="grid h-9 grid-cols-[180px_150px_90px_1fr_190px] items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-500">
             <span>예약일시</span>
+            <span>담당 의사</span>
             <span>상태</span>
             <span>방문 사유</span>
             <span className="text-right">관리</span>
@@ -35,13 +45,16 @@ function AppointmentList({
             {sortedAppointments.map((appointment) => (
               <div
                 key={appointment.id}
-                className="grid min-h-12 grid-cols-[180px_90px_1fr_190px] items-center gap-2 px-3 py-2 text-base"
+                className="grid min-h-12 grid-cols-[180px_150px_90px_1fr_190px] items-center gap-2 px-3 py-2 text-base"
               >
                 <p className="text-slate-900">
                   {new Date(
                     appointment.appointmentDate ||
                       appointment.appointmentDateTime,
                   ).toLocaleString()}
+                </p>
+                <p className="font-semibold text-slate-700">
+                  {getDoctorLabel(appointment.doctor)}
                 </p>
                 <p className="font-semibold text-slate-700">
                   {appointment.status || "예약됨"}

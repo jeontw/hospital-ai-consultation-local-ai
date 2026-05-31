@@ -17,6 +17,7 @@ function formatDateTimeValue(value) {
 function AppointmentForm({
   selectedPatient,
   selectedConsultation,
+  doctors = [],
   draft,
   onChangeDraft,
   onCreateAppointment,
@@ -75,6 +76,25 @@ function AppointmentForm({
           <p className="rounded-md bg-slate-50 px-3 py-2 text-base font-medium text-slate-700">
             예약 대상: {selectedPatient.name} / {selectedPatient.phone}
           </p>
+
+          <div>
+            <label className="mb-1 block text-base font-medium text-slate-700">
+              담당 의사
+            </label>
+            <select
+              value={draft?.doctorId || ""}
+              onChange={handleFieldChange("doctorId")}
+              className="h-10 w-full rounded-md border border-slate-300 px-3 text-base"
+              required
+            >
+              <option value="">담당 의사 선택</option>
+              {doctors.map((doctor) => (
+                <option key={doctor.id} value={doctor.id}>
+                  {doctor.name} ({doctor.specialty})
+                </option>
+              ))}
+            </select>
+          </div>
 
           <div>
             <label className="mb-1 block text-base font-medium text-slate-700">

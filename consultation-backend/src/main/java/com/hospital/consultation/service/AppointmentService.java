@@ -5,9 +5,11 @@ import com.hospital.consultation.dto.AppointmentDraftDto;
 import com.hospital.consultation.dto.AppointmentRequestDto;
 import com.hospital.consultation.entity.Appointment;
 import com.hospital.consultation.entity.Consultation;
+import com.hospital.consultation.entity.Doctor;
 import com.hospital.consultation.entity.Patient;
 import com.hospital.consultation.repository.AppointmentRepository;
 import com.hospital.consultation.repository.ConsultationRepository;
+import com.hospital.consultation.repository.DoctorRepository;
 import com.hospital.consultation.repository.PatientRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
@@ -36,16 +38,19 @@ public class AppointmentService {
     private final AppointmentRepository appointmentRepository;
     private final PatientRepository patientRepository;
     private final ConsultationRepository consultationRepository;
+    private final DoctorRepository doctorRepository;
     private final AiService aiService;
     private final ObjectMapper objectMapper;
 
     public Appointment createAppointment(AppointmentRequestDto requestDto) {
         LocalDateTime appointmentDateTime = getAppointmentDateTime(requestDto);
-        validateDuplicateReservation(appointmentDateTime, null);
+        Doctor doctor = getDoctor(requestDto.getDoctorId());
+        validateDuplicateReservation(doctor.getId(), appointmentDateTime, null);
 
         Appointment appointment = new Appointment();
         appointment.setPatient(getPatient(requestDto.getPatientId()));
         appointment.setConsultation(getOptionalConsultation(requestDto.getConsultationId()));
+        appointment.setDoctor(doctor);
         appointment.setAppointmentDateTime(appointmentDateTime);
         appointment.setPurpose(requestDto.getPurpose());
         appointment.setStatus(normalizeStatus(requestDto.getStatus()));
@@ -70,14 +75,16 @@ public class AppointmentService {
     public Appointment updateAppointment(Long appointmentId, AppointmentRequestDto requestDto) {
         Appointment appointment = getAppointment(appointmentId);
         LocalDateTime appointmentDateTime = getAppointmentDateTime(requestDto);
+        Doctor doctor = getDoctor(requestDto.getDoctorId());
         String status = normalizeStatus(requestDto.getStatus());
 
         if (RESERVED_STATUS.equals(status)) {
-            validateDuplicateReservation(appointmentDateTime, appointmentId);
+            validateDuplicateReservation(doctor.getId(), appointmentDateTime, appointmentId);
         }
 
         appointment.setPatient(getPatient(requestDto.getPatientId()));
         appointment.setConsultation(getOptionalConsultation(requestDto.getConsultationId()));
+        appointment.setDoctor(doctor);
         appointment.setAppointmentDateTime(appointmentDateTime);
         appointment.setPurpose(requestDto.getPurpose());
         appointment.setStatus(status);
@@ -90,8 +97,12 @@ public class AppointmentService {
         Appointment appointment = getAppointment(appointmentId);
         String normalizedStatus = normalizeStatus(status);
 
-        if (RESERVED_STATUS.equals(normalizedStatus)) {
-            validateDuplicateReservation(appointment.getAppointmentDateTime(), appointmentId);
+        if (RESERVED_STATUS.equals(normalizedStatus) && appointment.getDoctor() != null) {
+            validateDuplicateReservation(
+                    appointment.getDoctor().getId(),
+                    appointment.getAppointmentDateTime(),
+                    appointmentId
+            );
         }
 
         appointment.setStatus(normalizedStatus);
@@ -669,10 +680,15 @@ public class AppointmentService {
         return appointmentDateTime;
     }
 
-    private void validateDuplicateReservation(LocalDateTime appointmentDateTime, Long appointmentId) {
+    private void validateDuplicateReservation(Long doctorId, LocalDateTime appointmentDateTime, Long appointmentId) {
         boolean duplicated = appointmentId == null
-                ? appointmentRepository.existsByAppointmentDateTimeAndStatus(appointmentDateTime, RESERVED_STATUS)
-                : appointmentRepository.existsByAppointmentDateTimeAndStatusAndIdNot(
+                ? appointmentRepository.existsByDoctorIdAndAppointmentDateTimeAndStatus(
+                        doctorId,
+                        appointmentDateTime,
+                        RESERVED_STATUS
+                )
+                : appointmentRepository.existsByDoctorIdAndAppointmentDateTimeAndStatusAndIdNot(
+                        doctorId,
                         appointmentDateTime,
                         RESERVED_STATUS,
                         appointmentId
@@ -695,6 +711,15 @@ public class AppointmentService {
 
         return patientRepository.findById(patientId)
                 .orElseThrow(() -> new RuntimeException("환자를 찾을 수 없습니다."));
+    }
+
+    private Doctor getDoctor(Long doctorId) {
+        if (doctorId == null) {
+            throw new RuntimeException("담당 의사를 선택하세요.");
+        }
+
+        return doctorRepository.findById(doctorId)
+                .orElseThrow(() -> new RuntimeException("담당 의사를 찾을 수 없습니다."));
     }
 
     private Consultation getOptionalConsultation(Long consultationId) {

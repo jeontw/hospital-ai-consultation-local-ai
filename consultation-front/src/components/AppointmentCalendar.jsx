@@ -3,6 +3,14 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import interactionPlugin from "@fullcalendar/interaction";
 
 function AppointmentCalendar({ appointments }) {
+  const getDoctorName = (doctor) => {
+    if (!doctor?.name) {
+      return "미지정";
+    }
+
+    return doctor.name.replace(/\s*원장$/, "");
+  };
+
   const getStatusClassName = (status) => {
     if (status === "완료") {
       return "appointment-completed";
@@ -19,8 +27,11 @@ function AppointmentCalendar({ appointments }) {
     .filter((appointment) => appointment.appointmentDate || appointment.appointmentDateTime)
     .map((appointment) => ({
       id: String(appointment.id),
-      title: `${appointment.patient?.name || "환자 정보 없음"} - ${
-        appointment.status || "예약됨"
+      title: `[${getDoctorName(appointment.doctor)}] ${
+        appointment.memo ||
+        appointment.purpose ||
+        appointment.patient?.name ||
+        "예약"
       }`,
       date: appointment.appointmentDate || appointment.appointmentDateTime,
       className: getStatusClassName(appointment.status),

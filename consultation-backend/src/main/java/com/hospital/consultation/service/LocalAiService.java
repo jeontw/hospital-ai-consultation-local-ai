@@ -1,7 +1,6 @@
 package com.hospital.consultation.service;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -19,8 +18,7 @@ public class LocalAiService implements AiService {
 
     private final String ollamaUrl = "http://localhost:11434/api/generate";
 
-    @Value("${ollama.model:qwen2.5:7b}")
-    private String model;
+    private final AiModelSettingsService aiModelSettingsService;
 
     @Override
     public String summarize(String text) {
@@ -174,7 +172,7 @@ public class LocalAiService implements AiService {
             );
 
             Map<String, Object> body = Map.of(
-                    "model", model,
+                    "model", aiModelSettingsService.getCurrentModel(),
                     "prompt", prompt,
                     "stream", false,
                     "options", options

@@ -23,6 +23,8 @@ import {
   getAppointmentsByPatient,
   updateAppointmentStatus,
 } from "./api/appointmentApi";
+import { getAiModel, updateAiModel } from "./api/aiModelApi";
+import { getDoctors } from "./api/doctorApi";
 
 import Dashboard from "./components/Dashboard";
 import PatientForm from "./components/PatientForm";
@@ -38,6 +40,14 @@ import AppointmentCalendar from "./components/AppointmentCalendar";
 function App() {
   const [patients, setPatients] = useState([]);
   const [consultations, setConsultations] = useState([]);
+  const [doctors, setDoctors] = useState([]);
+  const [aiModel, setAiModel] = useState("");
+  const [aiModelOptions, setAiModelOptions] = useState([
+    "qwen2.5:3b",
+    "qwen2.5:7b",
+    "exaone3.5:7.8b",
+  ]);
+  const [isAiModelSaving, setIsAiModelSaving] = useState(false);
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -67,6 +77,7 @@ function App() {
     timeText: "",
     memo: "",
     status: "예약됨",
+    doctorId: "",
   });
   const [viewMode, setViewMode] = useState("list");
 
@@ -142,6 +153,51 @@ function App() {
     }
   };
 
+  const fetchDoctors = async () => {
+    try {
+      const response = await getDoctors();
+      setDoctors(response.data);
+      return response.data;
+    } catch (error) {
+      console.error("의사 목록 조회 실패:", error);
+      return [];
+    }
+  };
+
+  const fetchAiModel = async () => {
+    try {
+      const response = await getAiModel();
+      setAiModel(response.data.model || "");
+      if (Array.isArray(response.data.allowedModels)) {
+        setAiModelOptions(response.data.allowedModels);
+      }
+      return response.data;
+    } catch (error) {
+      console.error("AI 모델 조회 실패:", error);
+      return null;
+    }
+  };
+
+  const changeAiModel = async (event) => {
+    const nextModel = event.target.value;
+    setAiModel(nextModel);
+    setIsAiModelSaving(true);
+
+    try {
+      const response = await updateAiModel(nextModel);
+      setAiModel(response.data.model || nextModel);
+      if (Array.isArray(response.data.allowedModels)) {
+        setAiModelOptions(response.data.allowedModels);
+      }
+    } catch (error) {
+      console.error("AI 모델 변경 실패:", error);
+      alert(error.response?.data?.message || "AI 모델 변경 실패");
+      fetchAiModel();
+    } finally {
+      setIsAiModelSaving(false);
+    }
+  };
+
   const fetchSelectedPatientAppointments = async (patientId) => {
     if (!patientId) {
       setSelectedPatientAppointments([]);
@@ -164,6 +220,7 @@ function App() {
       timeText: "",
       memo: "",
       status: "예약됨",
+      doctorId: "",
     });
   };
 
@@ -178,6 +235,7 @@ function App() {
       timeText: draft.timeText || draft.timeExpression || "",
       memo: draft.memo || "",
       status: draft.status || "예약됨",
+      doctorId: "",
     });
   }, []);
 
@@ -222,6 +280,8 @@ function App() {
       fetchPatients();
       fetchConsultations();
       fetchAllAppointments();
+      fetchDoctors();
+      fetchAiModel();
     }, 0);
   }, []);
 
@@ -506,12 +566,18 @@ function App() {
       return false;
     }
 
+    if (!appointmentDraft.doctorId) {
+      alert("담당 의사를 선택하세요.");
+      return false;
+    }
+
     setIsAppointmentSaving(true);
 
     try {
       await createAppointment({
         patientId: selectedPatient.id,
         consultationId: selectedConsultation?.id || null,
+        doctorId: Number(appointmentDraft.doctorId),
         appointmentDate: appointmentDraft.appointmentDate,
         status: appointmentDraft.status || "예약됨",
         memo: appointmentDraft.memo,
@@ -597,13 +663,34 @@ function App() {
 
   return (
     <div className="min-h-screen bg-slate-100 p-4 text-slate-900">
-      <div className="mb-3 border-b border-slate-200 pb-3">
-        <h1 className="text-2xl font-bold tracking-tight">
-          병원 상담 관리 시스템
-        </h1>
-        <p className="mt-0.5 text-base text-slate-500">
-          환자 상담 기록, AI 분석, 예약 정보를 한 화면에서 관리합니다.
-        </p>
+      <div className="mb-3 flex items-start justify-between gap-3 border-b border-slate-200 pb-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">
+            병원 상담 관리 시스템
+          </h1>
+          <p className="mt-0.5 text-base text-slate-500">
+            환자 상담 기록, AI 분석, 예약 정보를 한 화면에서 관리합니다.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-500 shadow-sm">
+          <label htmlFor="ai-model-select" className="font-semibold">
+            AI 모델
+          </label>
+          <select
+            id="ai-model-select"
+            value={aiModel}
+            onChange={changeAiModel}
+            disabled={isAiModelSaving}
+            className="h-7 rounded border border-slate-300 bg-white px-2 text-xs text-slate-700 disabled:bg-slate-100"
+          >
+            {aiModelOptions.map((model) => (
+              <option key={model} value={model}>
+                {model}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <Dashboard
@@ -719,6 +806,7 @@ function App() {
             <AppointmentForm
               selectedPatient={selectedPatient}
               selectedConsultation={selectedConsultation}
+              doctors={doctors}
               draft={appointmentDraft}
               onChangeDraft={(field, value) => {
                 setAppointmentDraft((current) => ({

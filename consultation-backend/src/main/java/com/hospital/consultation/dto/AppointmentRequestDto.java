@@ -13,6 +13,8 @@ public class AppointmentRequestDto {
 
     private Long consultationId;
 
+    private Long doctorId;
+
     private LocalDateTime appointmentDate;
 
     private LocalDateTime appointmentDateTime;
