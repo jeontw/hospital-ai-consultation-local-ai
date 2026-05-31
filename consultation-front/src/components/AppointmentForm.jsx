@@ -47,7 +47,10 @@ function AppointmentForm({
     }
 
     const normalizedAppointmentDate = formatDateTimeValue(
-      draft?.appointmentDate || draft?.appointmentDateTime || "",
+      draft?.selectedSlot ||
+        draft?.appointmentDate ||
+        draft?.appointmentDateTime ||
+        "",
     );
 
     if (
@@ -64,6 +67,7 @@ function AppointmentForm({
       onChangeDraft("appointmentDateTime", normalizedAppointmentDate);
     }
   }, [
+    draft?.selectedSlot,
     draft?.appointmentDate,
     draft?.appointmentDateTime,
     onChangeDraft,
@@ -113,11 +117,14 @@ function AppointmentForm({
           <label className="mb-1 block text-base font-medium text-slate-700">
             예약 일시
           </label>
-          <input
-            type="datetime-local"
-            value={formatDateTimeValue(
-              draft?.appointmentDate || draft?.appointmentDateTime || "",
-            )}
+            <input
+              type="datetime-local"
+              value={formatDateTimeValue(
+                draft?.selectedSlot ||
+                  draft?.appointmentDate ||
+                  draft?.appointmentDateTime ||
+                  "",
+              )}
             onChange={handleFieldChange("appointmentDate")}
             max="9999-12-31T23:59"
             className="h-10 w-full rounded-md border border-slate-300 px-3 text-base"

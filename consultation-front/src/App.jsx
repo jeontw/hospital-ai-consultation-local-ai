@@ -80,6 +80,7 @@ function App() {
   const [isAppointmentSaving, setIsAppointmentSaving] = useState(false);
   const [appointmentDraft, setAppointmentDraft] = useState({
     appointmentDate: "",
+    selectedSlot: "",
     dateText: "",
     timeText: "",
     memo: "",
@@ -292,6 +293,7 @@ function App() {
   const clearAppointmentDraft = () => {
     setAppointmentDraft({
       appointmentDate: "",
+      selectedSlot: "",
       dateText: "",
       timeText: "",
       memo: "",
@@ -307,6 +309,7 @@ function App() {
 
     setAppointmentDraft({
       appointmentDate: draft.appointmentDate || draft.appointmentDateTime || "",
+      selectedSlot: draft.selectedSlot || "",
       dateText: draft.dateText || draft.dateExpression || "",
       timeText: draft.timeText || draft.timeExpression || "",
       memo: draft.memo || "",
@@ -389,6 +392,53 @@ function App() {
     return appointmentWithDoctor?.doctor?.id
       ? String(appointmentWithDoctor.doctor.id)
       : "";
+  };
+
+  const selectAppointmentFromCalendar = async (appointment) => {
+    const appointmentPatient = appointment.patient;
+    const patientId = appointmentPatient?.id;
+
+    if (!patientId) {
+      return;
+    }
+
+    const patient =
+      patients.find((patient) => String(patient.id) === String(patientId)) ||
+      appointmentPatient;
+    const consultation = appointment.consultation
+      ? {
+          ...appointment.consultation,
+          patient: appointment.consultation.patient || patient,
+        }
+      : null;
+
+    setSelectedViewPatientId(patientId);
+    setSelectedPatientId(patientId);
+    setSelectedPatient(patient);
+    setSelectedConsultation(consultation);
+    setViewMode(consultation ? "detail" : "list");
+    setConsultationAppointments([]);
+    setPatientAppointments([]);
+    setSelectedPatientAppointments([]);
+
+    fetchPatientConsultations(patientId);
+    const appointments = await fetchSelectedPatientAppointments(patientId);
+
+    if (consultation) {
+      fetchAppointmentsForConsultation(consultation);
+    }
+
+    const doctorId =
+      appointment.doctor?.id != null
+        ? String(appointment.doctor.id)
+        : getPreferredDoctorIdFromAppointments(appointments);
+
+    if (doctorId) {
+      setAppointmentDraft((current) => ({
+        ...current,
+        doctorId,
+      }));
+    }
   };
 
   const addPatient = async () => {
@@ -663,11 +713,12 @@ function App() {
       ...current,
       appointmentDate,
       appointmentDateTime: appointmentDate,
+      selectedSlot: appointmentDate,
       dateText: date,
       timeText: time,
-        status: "예약됨",
-        doctorId: String(doctorId),
-      }));
+      status: "예약됨",
+      doctorId: String(doctorId),
+    }));
   };
 
   const hasActivePatientAppointment = () => {
@@ -690,7 +741,12 @@ function App() {
       return false;
     }
 
-    if (!appointmentDraft.appointmentDate) {
+    const selectedAppointmentDate =
+      appointmentDraft.selectedSlot ||
+      appointmentDraft.appointmentDate ||
+      appointmentDraft.appointmentDateTime;
+
+    if (!selectedAppointmentDate) {
       alert("예약 일시를 입력하세요.");
       return false;
     }
@@ -712,7 +768,7 @@ function App() {
         patientId: selectedPatient.id,
         consultationId: selectedConsultation?.id || null,
         doctorId: Number(appointmentDraft.doctorId),
-        appointmentDate: appointmentDraft.appointmentDate,
+        appointmentDate: selectedAppointmentDate,
         status: "예약됨",
         memo: appointmentDraft.memo,
       });
@@ -926,11 +982,7 @@ function App() {
                   ? "왼쪽 환자 인사이트의 전체 상담 목록에서 상세 보기를 선택하세요."
                   : "환자를 선택하면 상담 상세를 확인할 수 있습니다."
               }
-              onBackToList={() => {
-                setSelectedConsultation(null);
-                setViewMode("list");
-              }}
-            />
+          />
           </div>
         </div>
 
@@ -948,6 +1000,7 @@ function App() {
               }));
             }}
             onSelectSlot={selectScheduleSlot}
+            onSelectAppointment={selectAppointmentFromCalendar}
             onSelectAppointmentPatient={(patientId) => {
               if (patientId) {
                 selectPatientForView(patientId);

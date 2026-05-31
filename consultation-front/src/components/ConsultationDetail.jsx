@@ -39,7 +39,6 @@ function ConsultationDetail({
   selectedConsultation,
   getRiskColor,
   emptyMessage = "상담을 선택하면 상세 정보가 표시됩니다.",
-  onBackToList,
 }) {
   if (!selectedConsultation) {
     return (
@@ -82,15 +81,6 @@ function ConsultationDetail({
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-lg font-bold text-slate-900">상담 상세</h2>
-
-        {onBackToList && (
-          <button
-            onClick={onBackToList}
-            className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            목록으로 돌아가기
-          </button>
-        )}
       </div>
 
       <div className="space-y-3">

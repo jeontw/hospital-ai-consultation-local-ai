@@ -109,6 +109,7 @@ function DoctorWeeklyCalendar({
   onChangeDoctor,
   onSelectSlot,
   onSelectAppointmentPatient,
+  onSelectAppointment,
   doctorManagement,
 }) {
   const activeDoctorId = selectedDoctorId || "";
@@ -306,9 +307,11 @@ function DoctorWeeklyCalendar({
                           <td
                             key={day.date}
                             onClick={() =>
-                              onSelectAppointmentPatient?.(
-                                appointment.patient?.id,
-                              )
+                              onSelectAppointment
+                                ? onSelectAppointment(appointment)
+                                : onSelectAppointmentPatient?.(
+                                    appointment.patient?.id,
+                                  )
                             }
                             className={`px-2.5 py-2 align-top text-sm ${
                               isCompleted(appointment)
