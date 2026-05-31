@@ -19,10 +19,10 @@ function ConsultationForm({
   );
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <section className="flex h-full flex-col rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <h2 className="mb-3 text-lg font-bold text-slate-900">상담 등록</h2>
 
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-1 flex-col gap-3">
         {selectedPatient ? (
           <p className="rounded-md bg-slate-50 px-3 py-2 text-base font-medium text-slate-700">
             상담 등록 대상: {selectedPatient.name} / {selectedPatient.phone}

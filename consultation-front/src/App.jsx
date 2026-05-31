@@ -24,18 +24,30 @@ import {
   updateAppointmentStatus,
 } from "./api/appointmentApi";
 import { getAiModel, updateAiModel } from "./api/aiModelApi";
-import { getDoctors } from "./api/doctorApi";
+import {
+  createDoctor,
+  deleteDoctorById,
+  getDoctors,
+  updateDoctorById,
+} from "./api/doctorApi";
 
 import Dashboard from "./components/Dashboard";
 import PatientForm from "./components/PatientForm";
 import ConsultationForm from "./components/ConsultationForm";
 import PatientList from "./components/PatientList";
 import ConsultationDetail from "./components/ConsultationDetail";
-import ConsultationList from "./components/ConsultationList";
 import PatientInsight from "./components/PatientInsight";
 import AppointmentForm from "./components/AppointmentForm";
 import AppointmentList from "./components/AppointmentList";
-import AppointmentCalendar from "./components/AppointmentCalendar";
+import DoctorWeeklyCalendar from "./components/DoctorWeeklyCalendar";
+import DoctorManagement from "./components/DoctorManagement";
+
+function getTodayDateInputValue() {
+  const now = new Date();
+  const timezoneOffset = now.getTimezoneOffset() * 60000;
+
+  return new Date(now.getTime() - timezoneOffset).toISOString().slice(0, 10);
+}
 
 function App() {
   const [patients, setPatients] = useState([]);
@@ -59,15 +71,14 @@ function App() {
   const [consultationText, setConsultationText] = useState("");
   const [nurseMemo, setNurseMemo] = useState("");
   const [selectedViewPatientId, setSelectedViewPatientId] = useState("");
-  const [searchKeyword, setSearchKeyword] = useState("");
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
   const [selectedConsultation, setSelectedConsultation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [loadingMessage, setLoadingMessage] = useState("");
-  const [consultationAppointments, setConsultationAppointments] = useState([]);
-  const [patientAppointments, setPatientAppointments] = useState([]);
+  const [, setConsultationAppointments] = useState([]);
+  const [, setPatientAppointments] = useState([]);
   const [allAppointments, setAllAppointments] = useState([]);
   const [selectedPatientAppointments, setSelectedPatientAppointments] = useState([]);
   const [isAppointmentSaving, setIsAppointmentSaving] = useState(false);
@@ -79,7 +90,8 @@ function App() {
     status: "예약됨",
     doctorId: "",
   });
-  const [viewMode, setViewMode] = useState("list");
+  const [selectedWeek, setSelectedWeek] = useState(getTodayDateInputValue());
+  const [, setViewMode] = useState("list");
 
   const fileInputRef = useRef(null);
   const appointmentDraftCacheRef = useRef(new Map());
@@ -195,6 +207,74 @@ function App() {
       fetchAiModel();
     } finally {
       setIsAiModelSaving(false);
+    }
+  };
+
+  const addDoctor = async (doctor) => {
+    try {
+      await createDoctor({
+        name: doctor.name.trim(),
+        specialty: doctor.specialty.trim(),
+        active: true,
+      });
+      alert("의사 등록 성공");
+      fetchDoctors();
+      return true;
+    } catch (error) {
+      console.error("의사 등록 실패:", error);
+      alert(error.response?.data?.message || "의사 등록 실패");
+      return false;
+    }
+  };
+
+  const updateDoctor = async (doctorId, doctor) => {
+    try {
+      await updateDoctorById(doctorId, {
+        name: doctor.name.trim(),
+        specialty: doctor.specialty.trim(),
+        active: doctor.active,
+      });
+      alert("의사 수정 성공");
+      fetchDoctors();
+      return true;
+    } catch (error) {
+      console.error("의사 수정 실패:", error);
+      alert(error.response?.data?.message || "의사 수정 실패");
+      return false;
+    }
+  };
+
+  const deleteDoctor = async (doctorId) => {
+    const confirmDelete = confirm(
+      "의사를 삭제할까요? 예약이 연결된 의사는 비활성화됩니다.",
+    );
+
+    if (!confirmDelete) {
+      return false;
+    }
+
+    try {
+      await deleteDoctorById(doctorId);
+      alert("의사 삭제 처리 완료");
+      const nextDoctors = await fetchDoctors();
+
+      const deletedDoctor = nextDoctors.find(
+        (doctor) => String(doctor.id) === String(doctorId),
+      );
+
+      if (!deletedDoctor || deletedDoctor.active === false) {
+        setAppointmentDraft((current) =>
+          String(current.doctorId) === String(doctorId)
+            ? { ...current, doctorId: "" }
+            : current,
+        );
+      }
+
+      return true;
+    } catch (error) {
+      console.error("의사 삭제 실패:", error);
+      alert(error.response?.data?.message || "의사 삭제 실패");
+      return false;
     }
   };
 
@@ -553,6 +633,19 @@ function App() {
     hasAppointmentIntent,
     selectedConsultation,
   ]);
+
+  const selectScheduleSlot = ({ doctorId, appointmentDate, date, time }) => {
+    setAppointmentDraft((current) => ({
+      ...current,
+      appointmentDate,
+      appointmentDateTime: appointmentDate,
+      dateText: date,
+      timeText: time,
+        status: "예약됨",
+        doctorId: String(doctorId),
+      }));
+  };
+
   const addPatientAppointment = async (event) => {
     event.preventDefault();
 
@@ -579,7 +672,7 @@ function App() {
         consultationId: selectedConsultation?.id || null,
         doctorId: Number(appointmentDraft.doctorId),
         appointmentDate: appointmentDraft.appointmentDate,
-        status: appointmentDraft.status || "예약됨",
+        status: "예약됨",
         memo: appointmentDraft.memo,
       });
       alert("예약 등록 성공");
@@ -661,6 +754,8 @@ function App() {
     return diffDays <= 7;
   }).length;
 
+  const activeDoctors = doctors.filter((doctor) => doctor.active === true);
+
   return (
     <div className="min-h-screen bg-slate-100 p-4 text-slate-900">
       <div className="mb-3 flex items-start justify-between gap-3 border-b border-slate-200 pb-3">
@@ -702,31 +797,21 @@ function App() {
 
       <section className="mb-3">
         <h2 className="mb-2 text-lg font-bold text-slate-700">
-          환자 업무 영역
+          주요 업무
         </h2>
 
-        <div className="grid grid-cols-[minmax(520px,1fr)_minmax(520px,0.95fr)] gap-3">
+        <div className="grid items-stretch grid-cols-[minmax(360px,1fr)_minmax(360px,1fr)_minmax(420px,1.1fr)] gap-3">
           <PatientList
             patients={patients}
             selectedViewPatientId={selectedViewPatientId}
             selectedPatientId={selectedPatientId}
+            selectedPatient={selectedPatient}
             onSelectPatient={selectPatientForView}
             deletePatient={deletePatient}
             updatePatient={updatePatient}
           />
 
-          <div className="space-y-3">
-            <PatientForm
-              name={name}
-              phone={phone}
-              birth={birth}
-              setName={setName}
-              setPhone={setPhone}
-              setBirth={setBirth}
-              addPatient={addPatient}
-              compact
-            />
-
+          <div className="h-full">
             <ConsultationForm
               patients={patients}
               selectedPatientId={selectedPatientId}
@@ -745,68 +830,12 @@ function App() {
               loadingMessage={loadingMessage}
             />
           </div>
-        </div>
-      </section>
 
-      <section>
-        <h2 className="mb-2 text-lg font-bold text-slate-700">
-          선택 환자 업무 영역
-        </h2>
-
-        <div className="grid grid-cols-[minmax(520px,1fr)_minmax(640px,1.25fr)] gap-3">
-          {viewMode === "detail" && selectedConsultation ? (
-            <ConsultationDetail
-              key={selectedConsultation.id}
-              selectedConsultation={selectedConsultation}
-              getRiskColor={getRiskColor}
-              onBackToList={() => setViewMode("list")}
-              onOpenInsight={(patient) => {
-                setSelectedPatient(patient);
-                setSelectedViewPatientId(patient.id);
-                setSelectedPatientId(patient.id);
-                fetchPatientConsultations(patient.id);
-                fetchSelectedPatientAppointments(patient.id);
-                clearAppointmentDraft();
-              }}
-            />
-          ) : (
-            <ConsultationList
-              consultations={consultations}
-              searchKeyword={searchKeyword}
-              setSearchKeyword={setSearchKeyword}
-              editingId={editingId}
-              editText={editText}
-              setEditText={setEditText}
-              updateConsultation={updateConsultation}
-              deleteConsultation={deleteConsultation}
-              setEditingId={setEditingId}
-              setSelectedConsultation={selectConsultation}
-              getRiskColor={getRiskColor}
-            />
-          )}
-
-          <PatientInsight
-            selectedPatient={selectedPatient}
-            consultations={consultations}
-            getRiskColor={getRiskColor}
-          />
-        </div>
-      </section>
-
-      <section className="mt-3">
-        <h2 className="mb-2 text-lg font-bold text-slate-700">
-          예약 관리
-        </h2>
-        <p className="mb-2 text-sm text-slate-500">
-          선택 상담 예약 {consultationAppointments.length}건 / 환자 예약 {patientAppointments.length}건
-        </p>
-
-        <div className="grid grid-cols-[minmax(420px,0.8fr)_minmax(560px,1.2fr)] gap-3">
-          <div className="space-y-3">
+          <div className="h-full">
             <AppointmentForm
               selectedPatient={selectedPatient}
               selectedConsultation={selectedConsultation}
-              doctors={doctors}
+              doctors={activeDoctors}
               draft={appointmentDraft}
               onChangeDraft={(field, value) => {
                 setAppointmentDraft((current) => ({
@@ -817,16 +846,101 @@ function App() {
               onCreateAppointment={addPatientAppointment}
               isSaving={isAppointmentSaving}
             />
+          </div>
+        </div>
+      </section>
 
-            <AppointmentList
-              selectedPatient={selectedPatient}
-              appointments={selectedPatientAppointments}
-              onUpdateStatus={changePatientAppointmentStatus}
-              onDeleteAppointment={removePatientAppointment}
+      <section>
+        <h2 className="mb-2 text-lg font-bold text-slate-700">
+          조회 영역
+        </h2>
+
+        <div className="grid grid-cols-[minmax(360px,1fr)_minmax(440px,1.15fr)_minmax(420px,1.1fr)] gap-3">
+          <ConsultationDetail
+            key={selectedConsultation?.id || "empty-detail"}
+            selectedConsultation={selectedConsultation}
+            getRiskColor={getRiskColor}
+            emptyMessage={
+              selectedPatient
+                ? "오른쪽 환자 인사이트의 전체 상담 목록에서 상세 보기를 선택하세요."
+                : "환자를 선택하면 상담 상세를 확인할 수 있습니다."
+            }
+            onBackToList={() => {
+              setSelectedConsultation(null);
+              setViewMode("list");
+            }}
+            onOpenInsight={(patient) => {
+              setSelectedPatient(patient);
+              setSelectedViewPatientId(patient.id);
+              setSelectedPatientId(patient.id);
+              fetchPatientConsultations(patient.id);
+              fetchSelectedPatientAppointments(patient.id);
+              clearAppointmentDraft();
+            }}
+          />
+
+          <PatientInsight
+            selectedPatient={selectedPatient}
+            consultations={consultations}
+            getRiskColor={getRiskColor}
+            editingId={editingId}
+            editText={editText}
+            setEditText={setEditText}
+            updateConsultation={updateConsultation}
+            deleteConsultation={deleteConsultation}
+            setEditingId={setEditingId}
+            onSelectConsultation={selectConsultation}
+          />
+
+          <DoctorWeeklyCalendar
+            doctors={activeDoctors}
+            appointments={allAppointments}
+            selectedWeek={selectedWeek}
+            selectedDoctorId={appointmentDraft.doctorId}
+            onChangeWeek={setSelectedWeek}
+            onChangeDoctor={(doctorId) => {
+              setAppointmentDraft((current) => ({
+                ...current,
+                doctorId,
+              }));
+            }}
+            onSelectSlot={selectScheduleSlot}
+          />
+        </div>
+      </section>
+
+      <section className="mt-3">
+        <h2 className="mb-2 text-lg font-bold text-slate-700">
+          관리 영역
+        </h2>
+
+        <div className="space-y-3">
+          <AppointmentList
+            selectedPatient={selectedPatient}
+            appointments={selectedPatientAppointments}
+            onUpdateStatus={changePatientAppointmentStatus}
+            onDeleteAppointment={removePatientAppointment}
+          />
+
+          <div className="grid grid-cols-[minmax(360px,0.8fr)_minmax(520px,1fr)] gap-3">
+            <PatientForm
+              name={name}
+              phone={phone}
+              birth={birth}
+              setName={setName}
+              setPhone={setPhone}
+              setBirth={setBirth}
+              addPatient={addPatient}
+              compact
+            />
+
+            <DoctorManagement
+              doctors={doctors}
+              onCreateDoctor={addDoctor}
+              onUpdateDoctor={updateDoctor}
+              onDeleteDoctor={deleteDoctor}
             />
           </div>
-
-          <AppointmentCalendar appointments={allAppointments} />
         </div>
       </section>
     </div>

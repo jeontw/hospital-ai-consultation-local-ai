@@ -718,8 +718,14 @@ public class AppointmentService {
             throw new RuntimeException("담당 의사를 선택하세요.");
         }
 
-        return doctorRepository.findById(doctorId)
+        Doctor doctor = doctorRepository.findById(doctorId)
                 .orElseThrow(() -> new RuntimeException("담당 의사를 찾을 수 없습니다."));
+
+        if (Boolean.FALSE.equals(doctor.getActive())) {
+            throw new RuntimeException("비활성화된 의사는 예약할 수 없습니다.");
+        }
+
+        return doctor;
     }
 
     private Consultation getOptionalConsultation(Long consultationId) {

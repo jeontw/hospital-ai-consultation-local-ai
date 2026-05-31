@@ -25,5 +25,7 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
             Long id
     );
 
+    boolean existsByDoctorId(Long doctorId);
+
     void deleteByConsultationId(Long consultationId);
 }

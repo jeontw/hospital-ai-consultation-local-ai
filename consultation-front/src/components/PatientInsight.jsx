@@ -1,7 +1,19 @@
 import { useEffect, useState } from "react";
 import { getPatientAiInsight } from "../api/consultationApi";
+import ConsultationList from "./ConsultationList";
 
-function PatientInsight({ selectedPatient, consultations, getRiskColor }) {
+function PatientInsight({
+  selectedPatient,
+  consultations,
+  getRiskColor,
+  editingId,
+  editText,
+  setEditText,
+  setEditingId,
+  updateConsultation,
+  deleteConsultation,
+  onSelectConsultation,
+}) {
   const [aiInsight, setAiInsight] = useState("");
   const [loadingInsight, setLoadingInsight] = useState(false);
 
@@ -30,9 +42,11 @@ function PatientInsight({ selectedPatient, consultations, getRiskColor }) {
   if (!selectedPatient) {
     return (
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-        <h2 className="mb-3 text-lg font-bold text-slate-900">환자 인사이트</h2>
+        <h2 className="mb-3 text-lg font-bold text-slate-900">
+          환자 인사이트
+        </h2>
         <p className="rounded-md border border-slate-200 bg-slate-50 p-4 text-base text-slate-500">
-          환자를 선택하면 누적 상담 분석이 표시됩니다.
+          환자를 선택하면 누적 상담 분석과 전체 상담 목록을 표시합니다.
         </p>
       </section>
     );
@@ -76,7 +90,9 @@ function PatientInsight({ selectedPatient, consultations, getRiskColor }) {
       <h2 className="mb-3 text-lg font-bold text-slate-900">환자 인사이트</h2>
 
       <div className="mb-3 rounded-md bg-slate-50 p-3">
-        <p className="text-xl font-bold text-slate-900">{selectedPatient.name}</p>
+        <p className="text-xl font-bold text-slate-900">
+          {selectedPatient.name}
+        </p>
         <p className="text-base text-slate-600">{selectedPatient.phone}</p>
         <p className="text-base text-slate-500">
           생년월일: {selectedPatient.birth || "없음"}
@@ -86,15 +102,17 @@ function PatientInsight({ selectedPatient, consultations, getRiskColor }) {
       <div className="mb-3 grid grid-cols-3 gap-3">
         <div className="rounded-md border border-slate-200 p-3">
           <p className="text-base text-slate-500">누적 상담</p>
-          <p className="text-2xl font-bold text-slate-900">{totalCount}회</p>
+          <p className="text-2xl font-bold text-slate-900">{totalCount}건</p>
         </div>
         <div className="rounded-md border border-slate-200 p-3">
           <p className="text-base text-slate-500">주의 상담</p>
-          <p className="text-2xl font-bold text-amber-600">{mediumRiskCount}회</p>
+          <p className="text-2xl font-bold text-amber-600">
+            {mediumRiskCount}건
+          </p>
         </div>
         <div className="rounded-md border border-slate-200 p-3">
-          <p className="text-base text-slate-500">높은 상담</p>
-          <p className="text-2xl font-bold text-red-600">{highRiskCount}회</p>
+          <p className="text-base text-slate-500">높은 위험</p>
+          <p className="text-2xl font-bold text-red-600">{highRiskCount}건</p>
         </div>
       </div>
 
@@ -119,9 +137,9 @@ function PatientInsight({ selectedPatient, consultations, getRiskColor }) {
           <p className="text-base leading-7 text-slate-700">
             이 환자는 현재까지 {totalCount}회의 상담 기록이 있습니다.
             {mediumRiskCount > 0 &&
-              ` 주의 단계 상담이 ${mediumRiskCount}회 확인되었습니다.`}
+              ` 주의 단계 상담이 ${mediumRiskCount}건 확인되었습니다.`}
             {highRiskCount > 0 &&
-              ` 높은 위험도 상담이 ${highRiskCount}회 확인되었습니다.`}
+              ` 높은 위험 상담이 ${highRiskCount}건 확인되었습니다.`}
             {recentConsultation &&
               ` 최근 상담일은 ${new Date(
                 recentConsultation.createdAt,
@@ -130,50 +148,33 @@ function PatientInsight({ selectedPatient, consultations, getRiskColor }) {
         )}
       </div>
 
-      <div className="mb-3">
-        <p className="mb-2 text-lg font-bold text-slate-900">누적 증상</p>
-        <p className="max-h-32 overflow-auto whitespace-pre-wrap text-base leading-7 text-slate-700">
-          {symptoms || "누적 증상 데이터 없음"}
-        </p>
-      </div>
+      <div className="mb-3 grid grid-cols-2 gap-3">
+        <div>
+          <p className="mb-2 text-lg font-bold text-slate-900">누적 증상</p>
+          <p className="max-h-32 overflow-auto whitespace-pre-wrap text-base leading-7 text-slate-700">
+            {symptoms || "누적 증상 데이터 없음"}
+          </p>
+        </div>
 
-      <div className="mb-3">
-        <p className="mb-2 text-lg font-bold text-slate-900">누적 키워드</p>
-        <p className="max-h-32 overflow-auto whitespace-pre-wrap text-base leading-7 text-slate-700">
-          {keywords || "누적 키워드 데이터 없음"}
-        </p>
-      </div>
-
-      <div>
-        <p className="mb-2 text-lg font-bold text-slate-900">상담 타임라인</p>
-
-        {sortedConsultations.length === 0 && (
-          <p className="text-base text-slate-500">상담 기록이 없습니다.</p>
-        )}
-
-        <div className="max-h-56 overflow-auto">
-          {sortedConsultations.map((consultation) => (
-            <div
-              key={consultation.id}
-              className="border-l border-slate-300 pb-3 pl-4"
-            >
-              <p className="text-sm text-slate-400">
-                {new Date(consultation.createdAt).toLocaleString()}
-              </p>
-              <p className="mt-1 text-base font-semibold text-slate-900">
-                {consultation.summary || "요약 없음"}
-              </p>
-              <span
-                className={`mt-2 inline-block rounded-full border px-3 py-1 text-sm font-bold ${getRiskColor(
-                  consultation.aiAnalysis?.riskLevel,
-                )}`}
-              >
-                위험도: {consultation.aiAnalysis?.riskLevel || "분석 없음"}
-              </span>
-            </div>
-          ))}
+        <div>
+          <p className="mb-2 text-lg font-bold text-slate-900">누적 키워드</p>
+          <p className="max-h-32 overflow-auto whitespace-pre-wrap text-base leading-7 text-slate-700">
+            {keywords || "누적 키워드 데이터 없음"}
+          </p>
         </div>
       </div>
+
+      <ConsultationList
+        consultations={sortedConsultations}
+        editingId={editingId}
+        editText={editText}
+        setEditText={setEditText}
+        updateConsultation={updateConsultation}
+        deleteConsultation={deleteConsultation}
+        setEditingId={setEditingId}
+        onSelectConsultation={onSelectConsultation}
+        getRiskColor={getRiskColor}
+      />
     </section>
   );
 }

@@ -1,16 +1,40 @@
+import { useState } from "react";
+
+function getAudioUrl(audioPath) {
+  if (!audioPath) {
+    return "";
+  }
+
+  if (audioPath.startsWith("http")) {
+    return audioPath;
+  }
+
+  return `http://localhost:8080${audioPath.startsWith("/") ? audioPath : `/${audioPath}`}`;
+}
+
+function getConsultationText(consultation) {
+  return (
+    consultation.summary ||
+    consultation.originalText ||
+    consultation.nurseMemo ||
+    "상담 내용 없음"
+  );
+}
+
 function ConsultationList({
   consultations,
-  searchKeyword,
-  setSearchKeyword,
   editingId,
   editText,
   setEditText,
   updateConsultation,
   deleteConsultation,
   setEditingId,
-  setSelectedConsultation,
+  onSelectConsultation,
   getRiskColor,
 }) {
+  const [searchKeyword, setSearchKeyword] = useState("");
+  const [playingAudioId, setPlayingAudioId] = useState(null);
+
   const filteredConsultations = [...consultations]
     .filter((consultation) => {
       const normalizedSearchKeyword = searchKeyword.trim().toLowerCase();
@@ -19,25 +43,31 @@ function ConsultationList({
         return true;
       }
 
-      const patientName = consultation.patient?.name || "";
-      const consultationText = consultation.originalText || "";
+      const consultationText = [
+        consultation.patient?.name,
+        consultation.summary,
+        consultation.originalText,
+        consultation.nurseMemo,
+        consultation.aiAnalysis?.keywords,
+        consultation.aiAnalysis?.symptoms,
+      ]
+        .filter(Boolean)
+        .join(" ");
 
-      return [patientName, consultationText]
-        .map((value) => value.toLowerCase())
-        .some((value) => value.includes(normalizedSearchKeyword));
+      return consultationText.toLowerCase().includes(normalizedSearchKeyword);
     })
-    .sort((a, b) => b.id - a.id);
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-      <div className="mb-2 flex items-center justify-between gap-3">
-        <h2 className="text-lg font-bold text-slate-900">상담 목록</h2>
+    <div className="rounded-md border border-slate-200 bg-white p-3">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-lg font-bold text-slate-900">전체 상담 목록</h3>
         <input
           type="text"
-          placeholder="환자명 또는 상담 내용 검색"
+          placeholder="상담 내용, 메모, 키워드 검색"
           value={searchKeyword}
-          onChange={(e) => setSearchKeyword(e.target.value)}
-          className="h-9 w-80 rounded-md border border-slate-300 px-3 text-base"
+          onChange={(event) => setSearchKeyword(event.target.value)}
+          className="h-9 w-full rounded-md border border-slate-300 px-3 text-base sm:w-80"
         />
       </div>
 
@@ -53,91 +83,115 @@ function ConsultationList({
         </p>
       )}
 
-      <div className="overflow-hidden rounded-md border border-slate-200">
-        <div className="grid h-8 grid-cols-[120px_160px_1fr_96px_150px] items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-500">
-          <span>환자</span>
-          <span>일시</span>
-          <span>요약</span>
-          <span>위험도</span>
-          <span className="text-right">관리</span>
-        </div>
+      <div className="space-y-2">
+        {filteredConsultations.map((consultation) => {
+          const isEditing = editingId === consultation.id;
+          const audioUrl = getAudioUrl(consultation.audioPath);
+          const isPlayingAudio = playingAudioId === consultation.id;
 
-        <div className="divide-y divide-slate-200">
-          {filteredConsultations.map((consultation) => (
+          return (
             <div
               key={consultation.id}
-              onClick={() => setSelectedConsultation(consultation)}
-              className="cursor-pointer px-3 py-1.5 hover:bg-slate-50"
+              className="rounded-md border border-slate-200 bg-white p-3"
             >
-              {editingId === consultation.id ? (
-                <div onClick={(e) => e.stopPropagation()} className="flex gap-2">
+              {isEditing ? (
+                <div className="space-y-2">
                   <textarea
                     value={editText}
-                    onChange={(e) => setEditText(e.target.value)}
-                    className="h-20 flex-1 rounded-md border border-slate-300 px-3 py-2 text-base"
+                    onChange={(event) => setEditText(event.target.value)}
+                    className="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-base"
                   />
-                  <button
-                    onClick={() => updateConsultation(consultation.id)}
-                    className="h-9 rounded-md bg-slate-800 px-3 text-sm font-medium text-white"
-                  >
-                    저장
-                  </button>
-                </div>
-              ) : (
-                <div className="grid min-h-11 grid-cols-[120px_160px_1fr_96px_150px] items-center gap-2 text-base">
-                  <p className="truncate font-bold text-slate-900">
-                    {consultation.patient?.name || "환자 정보 없음"}
-                  </p>
-                  <p className="truncate text-sm text-slate-400">
-                    {new Date(consultation.createdAt).toLocaleString()}
-                  </p>
-                  <p className="truncate text-slate-700">
-                    {consultation.summary || consultation.originalText || "내용 없음"}
-                  </p>
-                  <span
-                    className={`w-fit rounded-full border px-2 py-0.5 text-sm font-bold ${getRiskColor(
-                      consultation.aiAnalysis?.riskLevel,
-                    )}`}
-                  >
-                    {consultation.aiAnalysis?.riskLevel || "분석 없음"}
-                  </span>
                   <div className="flex justify-end gap-1.5">
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedConsultation(consultation);
-                      }}
-                      className="h-8 rounded-md bg-slate-800 px-2.5 text-sm font-medium text-white"
+                      type="button"
+                      onClick={() => updateConsultation(consultation.id)}
+                      className="h-8 rounded-md bg-slate-800 px-3 text-sm font-medium text-white"
                     >
-                      상세
+                      저장
                     </button>
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
+                      type="button"
+                      onClick={() => setEditingId(null)}
+                      className="h-8 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700"
+                    >
+                      취소
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-2 flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm text-slate-500">
+                        {new Date(consultation.createdAt).toLocaleString()}
+                      </p>
+                      <p className="mt-1 text-base font-semibold text-slate-900">
+                        {getConsultationText(consultation)}
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-full border px-2 py-0.5 text-sm font-bold ${getRiskColor(
+                        consultation.aiAnalysis?.riskLevel,
+                      )}`}
+                    >
+                      {consultation.aiAnalysis?.riskLevel || "분석 없음"}
+                    </span>
+                  </div>
+
+                  {isPlayingAudio && audioUrl && (
+                    <audio
+                      key={audioUrl}
+                      controls
+                      className="mb-2 w-full"
+                      src={audioUrl}
+                    />
+                  )}
+
+                  <div className="flex flex-wrap justify-end gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => onSelectConsultation(consultation)}
+                      className="h-8 rounded-md bg-slate-800 px-2.5 text-sm font-medium text-white"
+                    >
+                      상세 보기
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
                         setEditingId(consultation.id);
-                        setEditText(consultation.originalText);
+                        setEditText(consultation.originalText || "");
                       }}
                       className="h-8 rounded-md border border-slate-300 bg-white px-2.5 text-sm font-medium text-slate-700"
                     >
                       수정
                     </button>
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        deleteConsultation(consultation.id);
-                      }}
+                      type="button"
+                      onClick={() => deleteConsultation(consultation.id)}
                       className="h-8 rounded-md border border-slate-300 bg-white px-2.5 text-sm font-medium text-slate-700"
                     >
                       삭제
                     </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPlayingAudioId((current) =>
+                          current === consultation.id ? null : consultation.id,
+                        )
+                      }
+                      disabled={!audioUrl}
+                      className="h-8 rounded-md border border-slate-300 bg-white px-2.5 text-sm font-medium text-slate-700 disabled:bg-slate-100 disabled:text-slate-400"
+                    >
+                      오디오 재생
+                    </button>
                   </div>
-                </div>
+                </>
               )}
             </div>
-          ))}
-        </div>
+          );
+        })}
       </div>
-    </section>
+    </div>
   );
 }
 

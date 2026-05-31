@@ -22,5 +22,7 @@ public class Doctor {
 
     private String specialty;
 
+    private Boolean active = true;
+
     private LocalDateTime createdAt;
 }

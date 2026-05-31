@@ -32,6 +32,7 @@ public class DoctorDataInitializer implements CommandLineRunner {
         Doctor doctor = new Doctor();
         doctor.setName(name);
         doctor.setSpecialty(specialty);
+        doctor.setActive(true);
         doctor.setCreatedAt(LocalDateTime.now());
         return doctor;
     }
