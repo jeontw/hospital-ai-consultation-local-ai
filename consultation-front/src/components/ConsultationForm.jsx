@@ -1,12 +1,8 @@
 function ConsultationForm({
   patients,
   selectedPatientId,
-  registrationMode,
-  setRegistrationMode,
   audioFile,
   setAudioFile,
-  consultationText,
-  setConsultationText,
   nurseMemo,
   setNurseMemo,
   addConsultation,
@@ -19,7 +15,7 @@ function ConsultationForm({
   );
 
   return (
-    <section className="flex h-full flex-col rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <section className="flex flex-col rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <h2 className="mb-3 text-lg font-bold text-slate-900">상담 등록</h2>
 
       <div className="flex flex-1 flex-col gap-3">
@@ -33,53 +29,21 @@ function ConsultationForm({
           </p>
         )}
 
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => setRegistrationMode("audio")}
-            className={`h-10 rounded-md border px-3 text-base font-medium ${
-              registrationMode === "audio"
-                ? "border-slate-800 bg-slate-800 text-white"
-                : "border-slate-300 bg-white text-slate-700"
-            }`}
-          >
+        <div className="space-y-2">
+          <label className="mb-1 block text-base font-medium text-slate-700">
             파일 업로드
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setRegistrationMode("text")}
-            className={`h-10 rounded-md border px-3 text-base font-medium ${
-              registrationMode === "text"
-                ? "border-slate-800 bg-slate-800 text-white"
-                : "border-slate-300 bg-white text-slate-700"
-            }`}
-          >
-            상담 내용 직접 입력
-          </button>
-        </div>
-
-        {registrationMode === "audio" ? (
-          <div className="space-y-2">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="audio/*"
-              onChange={(e) => setAudioFile(e.target.files[0] || null)}
-              className="w-full rounded-md border border-slate-300 px-3 py-2 text-base file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-slate-700"
-            />
-            <p className="truncate rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-base text-slate-600">
-              선택 파일명: {audioFile?.name || "선택된 파일 없음"}
-            </p>
-          </div>
-        ) : (
-          <textarea
-            value={consultationText}
-            onChange={(e) => setConsultationText(e.target.value)}
-            className="min-h-28 rounded-md border border-slate-300 px-3 py-2 text-base leading-6"
-            placeholder="상담 내용을 입력하세요."
+          </label>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="audio/*"
+            onChange={(e) => setAudioFile(e.target.files[0] || null)}
+            className="w-full rounded-md border border-slate-300 px-3 py-2 text-base file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-slate-700"
           />
-        )}
+          <p className="truncate rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-base text-slate-600">
+            선택 파일명: {audioFile?.name || "선택된 파일 없음"}
+          </p>
+        </div>
 
         <div>
           <label className="mb-1 block text-base font-medium text-slate-700">
@@ -88,8 +52,8 @@ function ConsultationForm({
           <textarea
             value={nurseMemo}
             onChange={(e) => setNurseMemo(e.target.value)}
-            className="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-base leading-6"
-            placeholder="환자와 통화하며 기록한 메모를 입력하세요."
+            className="min-h-32 w-full rounded-md border border-slate-300 px-3 py-2 text-base leading-6"
+            placeholder="환자와 통화하며 기록한 상담 내용을 입력하세요."
           />
         </div>
 

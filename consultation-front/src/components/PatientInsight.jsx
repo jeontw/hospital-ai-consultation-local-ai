@@ -1,4 +1,5 @@
 import ConsultationList from "./ConsultationList";
+import AppointmentList from "./AppointmentList";
 
 function getConsultationText(consultation) {
   return (
@@ -29,6 +30,61 @@ function getTopTerms(values, limit = 5) {
     .slice(0, limit);
 }
 
+const RISK_FACTOR_PATTERNS = [
+  "고혈압",
+  "혈압",
+  "당뇨",
+  "혈당",
+  "심장",
+  "심근경색",
+  "협심증",
+  "흉통",
+  "가슴 통증",
+  "뇌졸중",
+  "중풍",
+  "호흡곤란",
+  "숨참",
+  "천식",
+  "폐렴",
+  "간질환",
+  "신장",
+  "신부전",
+  "암",
+  "수술",
+  "알레르기",
+  "임신",
+  "흡연",
+  "음주",
+  "항응고제",
+  "와파린",
+  "아스피린",
+];
+
+function getRiskFactors(consultations) {
+  const found = new Map();
+
+  consultations.forEach((consultation) => {
+    const text = [
+      consultation.summary,
+      consultation.originalText,
+      consultation.nurseMemo,
+      consultation.aiAnalysis?.symptoms,
+      consultation.aiAnalysis?.keywords,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
+
+    RISK_FACTOR_PATTERNS.forEach((pattern) => {
+      if (text.includes(pattern.toLowerCase())) {
+        found.set(pattern, (found.get(pattern) || 0) + 1);
+      }
+    });
+  });
+
+  return [...found.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+}
+
 function PatientInsight({
   selectedPatient,
   consultations,
@@ -41,6 +97,7 @@ function PatientInsight({
   updateConsultation,
   deleteConsultation,
   onSelectConsultation,
+  onUpdateAppointmentStatus,
   onDeleteAppointment,
 }) {
   if (!selectedPatient) {
@@ -49,9 +106,16 @@ function PatientInsight({
         <h2 className="mb-3 text-lg font-bold text-slate-900">
           환자 인사이트
         </h2>
-        <p className="rounded-md border border-slate-200 bg-slate-50 p-4 text-base text-slate-500">
-          환자를 선택하면 누적 상담 분석과 전체 상담 목록을 표시합니다.
-        </p>
+        <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+          <p className="text-base font-semibold text-slate-700">
+            환자를 선택하면 개인화 요약이 표시됩니다.
+          </p>
+          <div className="mt-3 grid gap-2 text-sm text-slate-500">
+            <p>최근 상담과 다음 예약을 한 번에 확인합니다.</p>
+            <p>반복 증상, 위험 인자, 위험 이력을 요약합니다.</p>
+            <p>전체 상담 목록과 예약 기록 관리는 선택 후 사용할 수 있습니다.</p>
+          </div>
+        </div>
       </section>
     );
   }
@@ -89,9 +153,7 @@ function PatientInsight({
   const topSymptoms = getTopTerms(
     patientConsultations.map((consultation) => consultation.aiAnalysis?.symptoms),
   );
-  const topKeywords = getTopTerms(
-    patientConsultations.map((consultation) => consultation.aiAnalysis?.keywords),
-  );
+  const riskFactors = getRiskFactors(patientConsultations);
 
   const highRiskCount = patientConsultations.filter(
     (consultation) =>
@@ -115,48 +177,48 @@ function PatientInsight({
       : doctor.name;
   };
 
+  const primaryDoctor =
+    nextAppointment?.doctor ||
+    sortedAppointments.find((appointment) => appointment.doctor?.id)?.doctor ||
+    null;
   const latestRiskLevel = recentConsultation?.aiAnalysis?.riskLevel || "분석 없음";
   const hasRiskHistory = highRiskCount > 0 || mediumRiskCount > 0;
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="mb-3 text-lg font-bold text-slate-900">환자 인사이트</h2>
-
-      <div className="mb-3 rounded-md bg-slate-50 p-3">
-        <p className="text-xl font-bold text-slate-900">
-          {selectedPatient.name}
-        </p>
-        <p className="text-base text-slate-600">{selectedPatient.phone}</p>
-        <p className="text-base text-slate-500">
-          생년월일: {selectedPatient.birth || "없음"}
-        </p>
-      </div>
-
-      <div className="mb-3 grid grid-cols-3 gap-3">
-        <div className="rounded-md border border-slate-200 p-3">
-          <p className="text-base text-slate-500">누적 상담</p>
-          <p className="text-2xl font-bold text-slate-900">{totalCount}건</p>
-        </div>
-        <div className="rounded-md border border-slate-200 p-3">
-          <p className="text-base text-slate-500">주의 상담</p>
-          <p className="text-2xl font-bold text-amber-600">
-            {mediumRiskCount}건
+    <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h2 className="text-lg font-bold text-slate-900">환자 인사이트</h2>
+          <p className="mt-0.5 text-sm text-slate-600">
+            {selectedPatient.name} | {selectedPatient.phone} | 생년월일:{" "}
+            {selectedPatient.birth || "없음"}
+          </p>
+          <p className="mt-0.5 text-sm font-semibold text-slate-700">
+            담당 의사: {getDoctorLabel(primaryDoctor)}
           </p>
         </div>
-        <div className="rounded-md border border-slate-200 p-3">
-          <p className="text-base text-slate-500">높은 위험</p>
-          <p className="text-2xl font-bold text-red-600">{highRiskCount}건</p>
+
+        <div className="flex flex-wrap gap-1.5 text-xs font-semibold">
+          <span className="rounded bg-slate-100 px-2 py-1 text-slate-700">
+            상담 {totalCount}건
+          </span>
+          <span className="rounded bg-amber-50 px-2 py-1 text-amber-700">
+            주의 {mediumRiskCount}건
+          </span>
+          <span className="rounded bg-red-50 px-2 py-1 text-red-700">
+            위험 {highRiskCount}건
+          </span>
         </div>
       </div>
 
-      <div className="mb-3 rounded-md border border-slate-200 bg-slate-50 p-3">
-        <p className="mb-2 text-lg font-bold text-slate-900">
+      <div className="mb-2 rounded-md border border-slate-200 bg-slate-50 p-2.5">
+        <p className="mb-2 text-base font-bold text-slate-900">
           이 환자 먼저 볼 것
         </p>
 
-        <div className="grid gap-3">
-          <div className="rounded-md border border-slate-200 bg-white p-3">
-            <p className="text-sm font-semibold text-slate-500">최근 상담</p>
+        <div className="grid grid-cols-2 gap-2">
+          <div className="rounded-md border border-slate-200 bg-white p-2.5">
+            <p className="text-xs font-semibold text-slate-500">최근 상담</p>
             {recentConsultation ? (
               <>
                 <div className="mt-1 flex flex-wrap items-center gap-2">
@@ -171,61 +233,58 @@ function PatientInsight({
                     {latestRiskLevel}
                   </span>
                 </div>
-                <p className="mt-2 line-clamp-3 text-base leading-7 text-slate-700">
+                <p className="mt-1 line-clamp-2 text-sm leading-6 text-slate-700">
                   {getConsultationText(recentConsultation)}
                 </p>
               </>
             ) : (
-              <p className="mt-1 text-base text-slate-500">
+              <p className="mt-1 text-sm text-slate-500">
                 상담 기록이 없습니다.
               </p>
             )}
           </div>
 
-          <div className="rounded-md border border-slate-200 bg-white p-3">
-            <p className="text-sm font-semibold text-slate-500">다음 예약</p>
+          <div className="rounded-md border border-slate-200 bg-white p-2.5">
+            <p className="text-xs font-semibold text-slate-500">다음 예약</p>
             {nextAppointment ? (
               <>
-                <p className="mt-1 text-base font-semibold text-slate-900">
+                <p className="mt-1 text-sm font-semibold text-slate-900">
                   {new Date(
                     nextAppointment.appointmentDate ||
                       nextAppointment.appointmentDateTime,
                   ).toLocaleString()}
                 </p>
-                <p className="mt-1 text-sm text-slate-600">
+                <p className="mt-1 line-clamp-2 text-sm text-slate-600">
                   {getDoctorLabel(nextAppointment.doctor)}
                   {nextAppointment.memo ? ` / ${nextAppointment.memo}` : ""}
                 </p>
               </>
             ) : (
-              <p className="mt-1 text-base text-slate-500">
+              <p className="mt-1 text-sm text-slate-500">
                 예정된 예약이 없습니다.
               </p>
             )}
           </div>
-
-          <div className="rounded-md border border-slate-200 bg-white p-3">
-            <p className="text-sm font-semibold text-slate-500">위험 이력</p>
-            <p className="mt-1 text-base leading-7 text-slate-700">
-              {hasRiskHistory
-                ? `주의 ${mediumRiskCount}건, 높은 위험 ${highRiskCount}건이 기록되어 있습니다.`
-                : "주의 또는 높은 위험 상담 기록이 없습니다."}
-            </p>
-          </div>
         </div>
+
+        <p className="mt-2 text-sm text-slate-600">
+          {hasRiskHistory
+            ? `위험 이력: 주의 ${mediumRiskCount}건, 높은 위험 ${highRiskCount}건`
+            : "위험 이력: 주의 또는 높은 위험 상담 기록 없음"}
+        </p>
       </div>
 
-      <div className="mb-3 grid grid-cols-2 gap-3">
-        <div className="rounded-md border border-slate-200 p-3">
-          <p className="mb-2 text-lg font-bold text-slate-900">반복 증상</p>
+      <div className="mb-2 grid grid-cols-2 gap-2">
+        <div className="rounded-md border border-slate-200 p-2.5">
+          <p className="mb-1.5 text-base font-bold text-slate-900">반복 증상</p>
           {topSymptoms.length === 0 ? (
-            <p className="text-base text-slate-500">누적 증상 데이터 없음</p>
+            <p className="text-sm text-slate-500">누적 증상 데이터 없음</p>
           ) : (
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-1.5">
               {topSymptoms.map(([symptom, count]) => (
                 <span
                   key={symptom}
-                  className="rounded bg-slate-100 px-2 py-1 text-sm font-semibold text-slate-700"
+                  className="rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700"
                 >
                   {symptom}
                   {count > 1 ? ` ${count}회` : ""}
@@ -235,18 +294,20 @@ function PatientInsight({
           )}
         </div>
 
-        <div className="rounded-md border border-slate-200 p-3">
-          <p className="mb-2 text-lg font-bold text-slate-900">진료 키워드</p>
-          {topKeywords.length === 0 ? (
-            <p className="text-base text-slate-500">누적 키워드 데이터 없음</p>
+        <div className="rounded-md border border-slate-200 p-2.5">
+          <p className="mb-1.5 text-base font-bold text-slate-900">
+            위험 인자/과거력
+          </p>
+          {riskFactors.length === 0 ? (
+            <p className="text-sm text-slate-500">확인된 위험 인자 없음</p>
           ) : (
-            <div className="flex flex-wrap gap-2">
-              {topKeywords.map(([keyword, count]) => (
+            <div className="flex flex-wrap gap-1.5">
+              {riskFactors.map(([factor, count]) => (
                 <span
-                  key={keyword}
-                  className="rounded bg-slate-100 px-2 py-1 text-sm font-semibold text-slate-700"
+                  key={factor}
+                  className="rounded bg-red-50 px-2 py-0.5 text-xs font-semibold text-red-700"
                 >
-                  {keyword}
+                  {factor}
                   {count > 1 ? ` ${count}회` : ""}
                 </span>
               ))}
@@ -255,17 +316,38 @@ function PatientInsight({
         </div>
       </div>
 
-      <ConsultationList
-        consultations={sortedConsultations}
-        editingId={editingId}
-        editText={editText}
-        setEditText={setEditText}
-        updateConsultation={updateConsultation}
-        deleteConsultation={deleteConsultation}
-        setEditingId={setEditingId}
-        onSelectConsultation={onSelectConsultation}
-        getRiskColor={getRiskColor}
-      />
+      <div className="mb-2">
+        <AppointmentList
+          selectedPatient={selectedPatient}
+          appointments={appointments}
+          onUpdateStatus={onUpdateAppointmentStatus}
+          onDeleteAppointment={onDeleteAppointment}
+          compact
+        />
+      </div>
+
+      <details className="rounded-md border border-slate-200 p-3">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900">
+          <span>전체 상담 목록 열기</span>
+          <span className="rounded bg-slate-100 px-2 py-0.5 text-sm font-semibold text-slate-600">
+            {sortedConsultations.length}건
+          </span>
+        </summary>
+
+        <div className="mt-3">
+          <ConsultationList
+            consultations={sortedConsultations}
+            editingId={editingId}
+            editText={editText}
+            setEditText={setEditText}
+            updateConsultation={updateConsultation}
+            deleteConsultation={deleteConsultation}
+            setEditingId={setEditingId}
+            onSelectConsultation={onSelectConsultation}
+            getRiskColor={getRiskColor}
+          />
+        </div>
+      </details>
 
       <details className="mt-3 rounded-md border border-slate-200 p-3">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-semibold text-slate-700 hover:text-slate-900">

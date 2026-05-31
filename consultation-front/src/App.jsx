@@ -37,7 +37,6 @@ import PatientList from "./components/PatientList";
 import ConsultationDetail from "./components/ConsultationDetail";
 import PatientInsight from "./components/PatientInsight";
 import AppointmentForm from "./components/AppointmentForm";
-import AppointmentList from "./components/AppointmentList";
 import DoctorWeeklyCalendar from "./components/DoctorWeeklyCalendar";
 import DoctorManagement from "./components/DoctorManagement";
 
@@ -66,8 +65,6 @@ function App() {
 
   const [selectedPatientId, setSelectedPatientId] = useState("");
   const [audioFile, setAudioFile] = useState(null);
-  const [registrationMode, setRegistrationMode] = useState("audio");
-  const [consultationText, setConsultationText] = useState("");
   const [nurseMemo, setNurseMemo] = useState("");
   const [selectedViewPatientId, setSelectedViewPatientId] = useState("");
   const [editingId, setEditingId] = useState(null);
@@ -350,7 +347,15 @@ function App() {
       fetchConsultations();
     } else {
       fetchPatientConsultations(patientId);
-      fetchSelectedPatientAppointments(patientId);
+      const appointments = await fetchSelectedPatientAppointments(patientId);
+      const doctorId = getPreferredDoctorIdFromAppointments(appointments);
+
+      if (doctorId) {
+        setAppointmentDraft((current) => ({
+          ...current,
+          doctorId,
+        }));
+      }
     }
   };
 
@@ -363,6 +368,28 @@ function App() {
       fetchAiModel();
     }, 0);
   }, []);
+
+  const getPreferredDoctorIdFromAppointments = (appointments) => {
+    const now = new Date();
+    const appointmentWithDoctor = [...appointments]
+      .filter((appointment) => appointment.doctor?.id)
+      .sort((a, b) => {
+        const aDate = new Date(a.appointmentDate || a.appointmentDateTime || 0);
+        const bDate = new Date(b.appointmentDate || b.appointmentDateTime || 0);
+        const aUpcoming = a.status !== "취소" && aDate >= now;
+        const bUpcoming = b.status !== "취소" && bDate >= now;
+
+        if (aUpcoming !== bUpcoming) {
+          return aUpcoming ? -1 : 1;
+        }
+
+        return aUpcoming ? aDate - bDate : bDate - aDate;
+      })[0];
+
+    return appointmentWithDoctor?.doctor?.id
+      ? String(appointmentWithDoctor.doctor.id)
+      : "";
+  };
 
   const addPatient = async () => {
     try {
@@ -438,10 +465,9 @@ function App() {
       return;
     }
 
-    const trimmedConsultationText = consultationText.trim();
     const trimmedNurseMemo = nurseMemo.trim();
 
-    if (!audioFile && !trimmedConsultationText && !trimmedNurseMemo) {
+    if (!audioFile && !trimmedNurseMemo) {
       alert("음성 파일 또는 간호사 메모를 입력하세요");
       return;
     }
@@ -464,8 +490,8 @@ function App() {
         setLoadingMessage("상담 내용 AI 분석 및 저장 중...");
 
         response = await createTextConsultation(selectedPatientId, {
-          originalText: trimmedConsultationText,
-          nurseMemo: trimmedNurseMemo,
+          originalText: trimmedNurseMemo,
+          nurseMemo: null,
           audioPath: null,
         });
       }
@@ -477,7 +503,6 @@ function App() {
       selectConsultation(response.data);
 
       setAudioFile(null);
-      setConsultationText("");
       setNurseMemo("");
 
       if (fileInputRef.current) {
@@ -815,13 +840,9 @@ function App() {
         </div>
       </div>
 
-      <section className="mb-3">
-        <h2 className="mb-2 text-lg font-bold text-slate-700">
-          주요 업무
-        </h2>
-
-        <div className="grid items-stretch grid-cols-[minmax(360px,1fr)_minmax(360px,1fr)_minmax(420px,1.1fr)] gap-3">
-          <div className="flex h-full min-h-0 flex-col gap-3">
+      <main className="grid h-[calc(100vh-112px)] min-h-[760px] grid-cols-[minmax(300px,0.5fr)_minmax(420px,1.5fr)_minmax(420px,1fr)] gap-4 overflow-hidden">
+        <div className="flex min-h-0 flex-col gap-3 overflow-auto pr-1">
+          <div className="flex min-h-[360px] flex-col gap-3">
             <PatientForm
               name={name}
               phone={phone}
@@ -833,108 +854,87 @@ function App() {
               compact
             />
 
-            <PatientList
-              patients={patients}
-              selectedViewPatientId={selectedViewPatientId}
-              selectedPatientId={selectedPatientId}
-              selectedPatient={selectedPatient}
-              onSelectPatient={selectPatientForView}
-              deletePatient={deletePatient}
-              updatePatient={updatePatient}
-            />
+            <div className="min-h-0 flex-1">
+              <PatientList
+                patients={patients}
+                selectedViewPatientId={selectedViewPatientId}
+                selectedPatientId={selectedPatientId}
+                selectedPatient={selectedPatient}
+                onSelectPatient={selectPatientForView}
+                deletePatient={deletePatient}
+                updatePatient={updatePatient}
+              />
+            </div>
           </div>
 
-          <div className="h-full">
-            <ConsultationForm
-              patients={patients}
-              selectedPatientId={selectedPatientId}
-              setSelectedPatientId={setSelectedPatientId}
-              registrationMode={registrationMode}
-              setRegistrationMode={setRegistrationMode}
-              audioFile={audioFile}
-              setAudioFile={setAudioFile}
-              consultationText={consultationText}
-              setConsultationText={setConsultationText}
-              nurseMemo={nurseMemo}
-              setNurseMemo={setNurseMemo}
-              addConsultation={addConsultation}
-              fileInputRef={fileInputRef}
-              isLoading={isLoading}
-              loadingMessage={loadingMessage}
-            />
-          </div>
+          <ConsultationForm
+            patients={patients}
+            selectedPatientId={selectedPatientId}
+            setSelectedPatientId={setSelectedPatientId}
+            audioFile={audioFile}
+            setAudioFile={setAudioFile}
+            nurseMemo={nurseMemo}
+            setNurseMemo={setNurseMemo}
+            addConsultation={addConsultation}
+            fileInputRef={fileInputRef}
+            isLoading={isLoading}
+            loadingMessage={loadingMessage}
+          />
 
-          <div className="flex h-full flex-col gap-3">
-            <AppointmentForm
-              selectedPatient={selectedPatient}
-              selectedConsultation={selectedConsultation}
-              doctors={activeDoctors}
-              draft={appointmentDraft}
-              onChangeDraft={(field, value) => {
-                setAppointmentDraft((current) => ({
-                  ...current,
-                  [field]: value,
-                }));
-              }}
-              onCreateAppointment={addPatientAppointment}
-              isSaving={isAppointmentSaving}
-            />
+          <AppointmentForm
+            selectedPatient={selectedPatient}
+            selectedConsultation={selectedConsultation}
+            doctors={activeDoctors}
+            draft={appointmentDraft}
+            onChangeDraft={(field, value) => {
+              setAppointmentDraft((current) => ({
+                ...current,
+                [field]: value,
+              }));
+            }}
+            onCreateAppointment={addPatientAppointment}
+            isSaving={isAppointmentSaving}
+          />
+        </div>
 
-            <AppointmentList
+        <div className="flex min-h-0 flex-col gap-3 overflow-hidden">
+          <div className="min-h-0 flex-1 overflow-auto pr-1">
+            <PatientInsight
               selectedPatient={selectedPatient}
+              consultations={consultations}
               appointments={selectedPatientAppointments}
-              onUpdateStatus={changePatientAppointmentStatus}
+              getRiskColor={getRiskColor}
+              editingId={editingId}
+              editText={editText}
+              setEditText={setEditText}
+              updateConsultation={updateConsultation}
+              deleteConsultation={deleteConsultation}
+              setEditingId={setEditingId}
+              onSelectConsultation={selectConsultation}
+              onUpdateAppointmentStatus={changePatientAppointmentStatus}
               onDeleteAppointment={removePatientAppointment}
-              compact
+            />
+          </div>
+
+          <div className="min-h-0 flex-1 overflow-auto pr-1">
+            <ConsultationDetail
+              key={selectedConsultation?.id || "empty-detail"}
+              selectedConsultation={selectedConsultation}
+              getRiskColor={getRiskColor}
+              emptyMessage={
+                selectedPatient
+                  ? "왼쪽 환자 인사이트의 전체 상담 목록에서 상세 보기를 선택하세요."
+                  : "환자를 선택하면 상담 상세를 확인할 수 있습니다."
+              }
+              onBackToList={() => {
+                setSelectedConsultation(null);
+                setViewMode("list");
+              }}
             />
           </div>
         </div>
-      </section>
 
-      <section>
-        <h2 className="mb-2 text-lg font-bold text-slate-700">
-          조회 영역
-        </h2>
-
-        <div className="grid grid-cols-[minmax(360px,1fr)_minmax(440px,1.15fr)_minmax(420px,1.1fr)] gap-3">
-          <PatientInsight
-            selectedPatient={selectedPatient}
-            consultations={consultations}
-            appointments={selectedPatientAppointments}
-            getRiskColor={getRiskColor}
-            editingId={editingId}
-            editText={editText}
-            setEditText={setEditText}
-            updateConsultation={updateConsultation}
-            deleteConsultation={deleteConsultation}
-            setEditingId={setEditingId}
-            onSelectConsultation={selectConsultation}
-            onDeleteAppointment={removePatientAppointment}
-          />
-
-          <ConsultationDetail
-            key={selectedConsultation?.id || "empty-detail"}
-            selectedConsultation={selectedConsultation}
-            getRiskColor={getRiskColor}
-            emptyMessage={
-              selectedPatient
-                ? "왼쪽 환자 인사이트의 전체 상담 목록에서 상세 보기를 선택하세요."
-                : "환자를 선택하면 상담 상세를 확인할 수 있습니다."
-            }
-            onBackToList={() => {
-              setSelectedConsultation(null);
-              setViewMode("list");
-            }}
-            onOpenInsight={(patient) => {
-              setSelectedPatient(patient);
-              setSelectedViewPatientId(patient.id);
-              setSelectedPatientId(patient.id);
-              fetchPatientConsultations(patient.id);
-              fetchSelectedPatientAppointments(patient.id);
-              clearAppointmentDraft();
-            }}
-          />
-
+        <div className="min-h-0">
           <DoctorWeeklyCalendar
             doctors={activeDoctors}
             appointments={allAppointments}
@@ -964,7 +964,7 @@ function App() {
             }
           />
         </div>
-      </section>
+      </main>
 
     </div>
   );

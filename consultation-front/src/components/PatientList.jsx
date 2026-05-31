@@ -192,7 +192,7 @@ function PatientList({
   );
 
   return (
-    <section className="flex h-[560px] min-h-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
       <div className="mb-2 flex items-center justify-between gap-2">
         <h2 className="text-lg font-bold text-slate-900">환자 목록</h2>
 

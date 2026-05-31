@@ -29,7 +29,11 @@ function AppointmentList({
   };
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <section
+      className={`rounded-lg border border-slate-200 bg-white shadow-sm ${
+        compact ? "p-3" : "p-4"
+      }`}
+    >
       <h2 className="mb-3 text-lg font-bold text-slate-900">
         현재 환자 예약 목록
       </h2>
@@ -43,7 +47,7 @@ function AppointmentList({
           등록된 예약이 없습니다.
         </p>
       ) : compact ? (
-        <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+        <div className="max-h-48 space-y-2 overflow-y-auto pr-1">
           {sortedAppointments.map((appointment) => (
             <div
               key={appointment.id}

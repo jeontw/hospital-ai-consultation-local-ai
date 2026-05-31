@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 const OPEN_TIME = 9;
 const CLOSE_TIME = 18;
@@ -118,6 +118,12 @@ function DoctorWeeklyCalendar({
   const weekDays = useMemo(() => getWeekDays(selectedWeek), [selectedWeek]);
   const timeSlots = useMemo(() => createTimeSlots(), []);
 
+  useEffect(() => {
+    if (!activeDoctorId && doctors.length > 0) {
+      onChangeDoctor?.(String(doctors[0].id));
+    }
+  }, [activeDoctorId, doctors, onChangeDoctor]);
+
   const appointmentsBySlot = useMemo(() => {
     const weekDateSet = new Set(weekDays.map((day) => day.date));
 
@@ -165,7 +171,7 @@ function DoctorWeeklyCalendar({
   };
 
   return (
-    <section className="flex min-h-[1320px] flex-col rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+    <section className="flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
       <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
         <div>
           <h2 className="text-lg font-bold text-slate-900">
@@ -253,7 +259,7 @@ function DoctorWeeklyCalendar({
             </h3>
           </div>
 
-          <div className="min-h-0 flex-1 overflow-x-auto">
+          <div className="min-h-0 flex-1 overflow-auto">
             <table className="h-full min-w-full border-collapse text-left text-base">
               <thead className="bg-white text-sm font-semibold text-slate-600">
                 <tr>

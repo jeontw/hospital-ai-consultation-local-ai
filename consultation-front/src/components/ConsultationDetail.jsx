@@ -38,7 +38,6 @@ function normalizeList(value) {
 function ConsultationDetail({
   selectedConsultation,
   getRiskColor,
-  onOpenInsight,
   emptyMessage = "상담을 선택하면 상세 정보가 표시됩니다.",
   onBackToList,
 }) {
@@ -46,9 +45,18 @@ function ConsultationDetail({
     return (
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
         <h2 className="mb-3 text-lg font-bold text-slate-900">상담 상세</h2>
-        <p className="rounded-md border border-slate-200 bg-slate-50 p-4 text-base text-slate-500">
-          {emptyMessage}
-        </p>
+        <div className="rounded-md border border-slate-200 bg-slate-50 p-4">
+          <p className="text-base font-semibold text-slate-700">
+            선택된 상담이 없습니다.
+          </p>
+          <p className="mt-2 text-sm leading-6 text-slate-500">
+            {emptyMessage}
+          </p>
+          <div className="mt-3 grid gap-2 text-sm text-slate-500">
+            <p>환자 인사이트의 전체 상담 목록에서 상세 보기를 누르면 표시됩니다.</p>
+            <p>상담 원문, 간호사 메모, AI 요약, 의사용 브리핑을 확인할 수 있습니다.</p>
+          </div>
+        </div>
       </section>
     );
   }
@@ -75,24 +83,14 @@ function ConsultationDetail({
       <div className="mb-3 flex items-center justify-between gap-3">
         <h2 className="text-lg font-bold text-slate-900">상담 상세</h2>
 
-        <div className="flex gap-2">
-          {onBackToList && (
-            <button
-              onClick={onBackToList}
-              className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
-            >
-              목록으로 돌아가기
-            </button>
-          )}
-
+        {onBackToList && (
           <button
-            onClick={() => onOpenInsight?.(selectedConsultation.patient)}
-            disabled={!selectedConsultation.patient}
-            className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 disabled:bg-slate-200"
+            onClick={onBackToList}
+            className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50"
           >
-            AI 인사이트
+            목록으로 돌아가기
           </button>
-        </div>
+        )}
       </div>
 
       <div className="space-y-3">
