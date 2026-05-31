@@ -5,6 +5,7 @@ function DoctorManagement({
   onCreateDoctor,
   onUpdateDoctor,
   onDeleteDoctor,
+  embedded = false,
 }) {
   const [name, setName] = useState("");
   const [specialty, setSpecialty] = useState("");
@@ -55,8 +56,21 @@ function DoctorManagement({
     }
   };
 
+  const activateDoctor = async (doctor) => {
+    await onUpdateDoctor(doctor.id, {
+      name: doctor.name,
+      specialty: doctor.specialty,
+      active: true,
+    });
+  };
+
+  const Wrapper = embedded ? "div" : "section";
+  const wrapperClassName = embedded
+    ? ""
+    : "rounded-lg border border-slate-200 bg-white p-4 shadow-sm";
+
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <Wrapper className={wrapperClassName}>
       <h2 className="mb-3 text-lg font-bold text-slate-900">의사 관리</h2>
 
       <form onSubmit={submitCreate} className="mb-4 grid grid-cols-[1fr_1fr_auto] gap-2">
@@ -140,6 +154,15 @@ function DoctorManagement({
                   </p>
                   <p className="text-slate-600">{doctor.specialty}</p>
                   <div className="flex justify-end gap-1.5">
+                    {doctor.active === false && (
+                      <button
+                        type="button"
+                        onClick={() => activateDoctor(doctor)}
+                        className="h-8 rounded-md bg-emerald-600 px-2.5 text-sm font-medium text-white"
+                      >
+                        활성화
+                      </button>
+                    )}
                     <button
                       type="button"
                       onClick={() => startEdit(doctor)}
@@ -161,7 +184,7 @@ function DoctorManagement({
           ))}
         </div>
       )}
-    </section>
+    </Wrapper>
   );
 }
 

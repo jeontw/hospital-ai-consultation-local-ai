@@ -83,7 +83,7 @@ function ConsultationList({
         </p>
       )}
 
-      <div className="space-y-2">
+      <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
         {filteredConsultations.map((consultation) => {
           const isEditing = editingId === consultation.id;
           const audioUrl = getAudioUrl(consultation.audioPath);

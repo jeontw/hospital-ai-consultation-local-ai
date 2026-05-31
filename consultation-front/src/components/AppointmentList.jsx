@@ -3,8 +3,17 @@ function AppointmentList({
   appointments,
   onUpdateStatus,
   onDeleteAppointment,
+  compact = false,
 }) {
-  const sortedAppointments = [...appointments].sort(
+  const now = new Date();
+  const upcomingAppointments = appointments.filter((appointment) => {
+    const appointmentTime = new Date(
+      appointment.appointmentDate || appointment.appointmentDateTime || 0,
+    );
+
+    return appointmentTime >= now;
+  });
+  const sortedAppointments = [...upcomingAppointments].sort(
     (a, b) =>
       new Date(a.appointmentDate || a.appointmentDateTime || 0) -
       new Date(b.appointmentDate || b.appointmentDateTime || 0),
@@ -21,7 +30,9 @@ function AppointmentList({
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="mb-3 text-lg font-bold text-slate-900">예약 목록</h2>
+      <h2 className="mb-3 text-lg font-bold text-slate-900">
+        현재 환자 예약 목록
+      </h2>
 
       {!selectedPatient ? (
         <p className="rounded-md border border-slate-200 bg-slate-50 p-4 text-base text-slate-500">
@@ -31,6 +42,45 @@ function AppointmentList({
         <p className="rounded-md border border-slate-200 bg-slate-50 p-4 text-base text-slate-500">
           등록된 예약이 없습니다.
         </p>
+      ) : compact ? (
+        <div className="max-h-72 space-y-2 overflow-y-auto pr-1">
+          {sortedAppointments.map((appointment) => (
+            <div
+              key={appointment.id}
+              className="rounded-md border border-slate-200 p-3 text-sm"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="font-semibold text-slate-900">
+                    {new Date(
+                      appointment.appointmentDate ||
+                        appointment.appointmentDateTime,
+                    ).toLocaleString()}
+                  </p>
+                  <p className="mt-1 text-slate-600">
+                    {getDoctorLabel(appointment.doctor)}
+                  </p>
+                </div>
+                <span className="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
+                  {appointment.status || "예약됨"}
+                </span>
+              </div>
+
+              <p className="mt-2 line-clamp-2 text-slate-600">
+                {appointment.memo || "방문 사유 없음"}
+              </p>
+
+              <div className="mt-3 flex justify-end">
+                <button
+                  onClick={() => onDeleteAppointment(appointment.id)}
+                  className="h-8 rounded-md bg-slate-800 px-2.5 text-sm font-medium text-white"
+                >
+                  삭제
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
         <div className="overflow-hidden rounded-md border border-slate-200">
           <div className="grid h-9 grid-cols-[180px_150px_90px_1fr_190px] items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-500">

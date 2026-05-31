@@ -108,6 +108,8 @@ function DoctorWeeklyCalendar({
   onChangeWeek,
   onChangeDoctor,
   onSelectSlot,
+  onSelectAppointmentPatient,
+  doctorManagement,
 }) {
   const activeDoctorId = selectedDoctorId || "";
   const selectedDoctor = doctors.find(
@@ -163,41 +165,54 @@ function DoctorWeeklyCalendar({
   };
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="mb-4 flex flex-wrap items-end justify-between gap-3">
+    <section className="flex min-h-[1320px] flex-col rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
         <div>
           <h2 className="text-lg font-bold text-slate-900">
             의사별 주간 예약표
           </h2>
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-0.5 text-sm text-slate-500">
             선택한 의사의 주중 예약 현황을 확인하고 빈 시간을 예약 폼에 반영합니다.
           </p>
         </div>
 
-        <label className="block min-w-60">
-          <span className="mb-1 block text-sm font-semibold text-slate-600">
-            담당 의사 선택
-          </span>
-          <select
-            value={activeDoctorId}
-            onChange={(event) => onChangeDoctor?.(event.target.value)}
-            className="h-10 w-full rounded-md border border-slate-300 px-3 text-base"
-          >
-            <option value="">담당 의사 선택</option>
-            {doctors.map((doctor) => (
-              <option key={doctor.id} value={doctor.id}>
-                {doctor.name} ({doctor.specialty})
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className="flex items-end gap-2">
+          <label className="block min-w-60">
+            <span className="mb-1 block text-sm font-semibold text-slate-600">
+              담당 의사 선택
+            </span>
+            <select
+              value={activeDoctorId}
+              onChange={(event) => onChangeDoctor?.(event.target.value)}
+              className="h-9 w-full rounded-md border border-slate-300 px-2.5 text-base"
+            >
+              <option value="">담당 의사 선택</option>
+              {doctors.map((doctor) => (
+                <option key={doctor.id} value={doctor.id}>
+                  {doctor.name} ({doctor.specialty})
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {doctorManagement && (
+            <details className="relative">
+              <summary className="flex h-9 cursor-pointer list-none items-center rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+                의사 관리 열기
+              </summary>
+              <div className="absolute right-0 z-30 mt-2 w-[560px] rounded-md border border-slate-200 bg-white p-3 shadow-lg">
+                {doctorManagement}
+              </div>
+            </details>
+          )}
+        </div>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
         <button
           type="button"
           onClick={() => moveWeek(-7)}
-          className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
         >
           이전 주
         </button>
@@ -208,7 +223,7 @@ function DoctorWeeklyCalendar({
             type="date"
             value={toDateInputValue(selectedWeek)}
             onChange={(event) => onChangeWeek?.(event.target.value)}
-            className="h-10 rounded-md border border-slate-300 px-3 text-base"
+            className="h-9 rounded-md border border-slate-300 px-3 text-base"
           />
         </label>
 
@@ -219,7 +234,7 @@ function DoctorWeeklyCalendar({
         <button
           type="button"
           onClick={() => moveWeek(7)}
-          className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
         >
           다음 주
         </button>
@@ -230,25 +245,25 @@ function DoctorWeeklyCalendar({
           주간 예약표를 보려면 담당 의사를 선택하세요.
         </p>
       ) : (
-        <div className="overflow-hidden rounded-lg border border-slate-200">
-          <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-            <h3 className="text-lg font-bold text-slate-900">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-slate-200">
+          <div className="border-b border-slate-200 bg-slate-50 px-3 py-2">
+            <h3 className="text-base font-bold text-slate-900">
               {selectedDoctor.name}
               {selectedDoctor.specialty ? ` (${selectedDoctor.specialty})` : ""}
             </h3>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="min-w-full border-collapse text-left text-base">
+          <div className="min-h-0 flex-1 overflow-x-auto">
+            <table className="h-full min-w-full border-collapse text-left text-base">
               <thead className="bg-white text-sm font-semibold text-slate-600">
                 <tr>
-                  <th className="sticky left-0 z-10 w-24 border-b border-r border-slate-200 bg-white px-3 py-3">
+                  <th className="sticky left-0 z-10 w-20 border-b border-r border-slate-200 bg-white px-2.5 py-2">
                     시간
                   </th>
                   {weekDays.map((day) => (
                     <th
                       key={day.date}
-                      className="min-w-40 border-b border-slate-200 px-3 py-3"
+                      className="min-w-32 border-b border-slate-200 px-2.5 py-2"
                     >
                       <span className="block text-slate-900">{day.label}</span>
                       <span className="mt-0.5 block text-xs font-medium text-slate-500">
@@ -261,7 +276,7 @@ function DoctorWeeklyCalendar({
               <tbody>
                 {timeSlots.map((slot) => (
                   <tr key={slot.time} className="border-b border-slate-100">
-                    <th className="sticky left-0 z-10 border-r border-slate-200 bg-white px-3 py-3 font-semibold text-slate-700">
+                    <th className="sticky left-0 z-10 border-r border-slate-200 bg-white px-2.5 py-2 text-sm font-semibold text-slate-700">
                       {slot.time}
                     </th>
                     {weekDays.map((day) => {
@@ -273,7 +288,7 @@ function DoctorWeeklyCalendar({
                         return (
                           <td
                             key={day.date}
-                            className="bg-slate-100 px-3 py-3 text-slate-500"
+                            className="bg-slate-100 px-2.5 py-2 text-sm text-slate-500"
                           >
                             점심시간
                           </td>
@@ -284,22 +299,27 @@ function DoctorWeeklyCalendar({
                         return (
                           <td
                             key={day.date}
-                            className={`px-3 py-3 align-top ${
+                            onClick={() =>
+                              onSelectAppointmentPatient?.(
+                                appointment.patient?.id,
+                              )
+                            }
+                            className={`px-2.5 py-2 align-top text-sm ${
                               isCompleted(appointment)
                                 ? "bg-emerald-50"
                                 : "bg-blue-50"
-                            }`}
+                            } cursor-pointer hover:ring-2 hover:ring-inset hover:ring-blue-300`}
                           >
-                            <p className="font-bold text-slate-900">
+                            <p className="font-bold leading-tight text-slate-900">
                               {appointment.patient?.name || "환자명 없음"}
                             </p>
-                            <p className="mt-1 line-clamp-2 text-sm text-slate-600">
+                            <p className="mt-0.5 line-clamp-1 text-sm text-slate-600">
                               {appointment.memo ||
                                 appointment.purpose ||
                                 "방문 사유 없음"}
                             </p>
                             <span
-                              className={`mt-2 inline-flex rounded px-2 py-0.5 text-xs font-semibold ${
+                              className={`mt-1 inline-flex rounded px-1.5 py-0.5 text-xs font-semibold ${
                                 isCompleted(appointment)
                                   ? "bg-emerald-100 text-emerald-700"
                                   : "bg-blue-100 text-blue-700"
@@ -312,11 +332,11 @@ function DoctorWeeklyCalendar({
                       }
 
                       return (
-                        <td key={day.date} className="px-2 py-2">
+                        <td key={day.date} className="px-1.5 py-1.5">
                           <button
                             type="button"
                             onClick={() => handleSelectSlot(day.date, slot.time)}
-                            className="min-h-20 w-full rounded-md border border-dashed border-slate-300 bg-white px-3 py-2 text-left font-semibold text-slate-700 transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                            className="min-h-16 w-full rounded-md border border-dashed border-slate-300 bg-white px-2.5 py-1.5 text-left text-sm font-semibold text-slate-700 transition hover:border-blue-400 hover:bg-blue-50 hover:text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-300"
                           >
                             예약 가능
                           </button>

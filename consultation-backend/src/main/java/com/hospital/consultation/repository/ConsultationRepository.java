@@ -9,4 +9,6 @@ public interface ConsultationRepository extends JpaRepository<Consultation, Long
 
     List<Consultation> findByPatientId(Long patientId);
 
+    void deleteByPatientId(Long patientId);
+
 }

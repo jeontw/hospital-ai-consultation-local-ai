@@ -46,6 +46,7 @@ public class AppointmentService {
         LocalDateTime appointmentDateTime = getAppointmentDateTime(requestDto);
         Doctor doctor = getDoctor(requestDto.getDoctorId());
         validateDuplicateReservation(doctor.getId(), appointmentDateTime, null);
+        validatePatientActiveReservation(requestDto.getPatientId(), null);
 
         Appointment appointment = new Appointment();
         appointment.setPatient(getPatient(requestDto.getPatientId()));
@@ -80,6 +81,7 @@ public class AppointmentService {
 
         if (RESERVED_STATUS.equals(status)) {
             validateDuplicateReservation(doctor.getId(), appointmentDateTime, appointmentId);
+            validatePatientActiveReservation(requestDto.getPatientId(), appointmentId);
         }
 
         appointment.setPatient(getPatient(requestDto.getPatientId()));
@@ -103,6 +105,7 @@ public class AppointmentService {
                     appointment.getAppointmentDateTime(),
                     appointmentId
             );
+            validatePatientActiveReservation(appointment.getPatient().getId(), appointmentId);
         }
 
         appointment.setStatus(normalizedStatus);
@@ -696,6 +699,29 @@ public class AppointmentService {
 
         if (duplicated) {
             throw new RuntimeException("이미 해당 시간에 예약이 있습니다.");
+        }
+    }
+
+    private void validatePatientActiveReservation(Long patientId, Long appointmentId) {
+        if (patientId == null) {
+            throw new RuntimeException("환자 ID가 필요합니다.");
+        }
+
+        boolean duplicated = appointmentId == null
+                ? appointmentRepository.existsByPatientIdAndStatusAndAppointmentDateTimeGreaterThanEqual(
+                        patientId,
+                        RESERVED_STATUS,
+                        LocalDateTime.now()
+                )
+                : appointmentRepository.existsByPatientIdAndStatusAndAppointmentDateTimeGreaterThanEqualAndIdNot(
+                        patientId,
+                        RESERVED_STATUS,
+                        LocalDateTime.now(),
+                        appointmentId
+                );
+
+        if (duplicated) {
+            throw new RuntimeException("환자당 예약은 1개만 등록할 수 있습니다.");
         }
     }
 

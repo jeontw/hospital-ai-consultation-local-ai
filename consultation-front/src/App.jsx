@@ -31,7 +31,6 @@ import {
   updateDoctorById,
 } from "./api/doctorApi";
 
-import Dashboard from "./components/Dashboard";
 import PatientForm from "./components/PatientForm";
 import ConsultationForm from "./components/ConsultationForm";
 import PatientList from "./components/PatientList";
@@ -646,6 +645,18 @@ function App() {
       }));
   };
 
+  const hasActivePatientAppointment = () => {
+    const now = new Date();
+
+    return selectedPatientAppointments.some((appointment) => {
+      const appointmentDate = new Date(
+        appointment.appointmentDate || appointment.appointmentDateTime || 0,
+      );
+
+      return appointment.status !== "취소" && appointmentDate >= now;
+    });
+  };
+
   const addPatientAppointment = async (event) => {
     event.preventDefault();
 
@@ -661,6 +672,11 @@ function App() {
 
     if (!appointmentDraft.doctorId) {
       alert("담당 의사를 선택하세요.");
+      return false;
+    }
+
+    if (hasActivePatientAppointment()) {
+      alert("환자당 예약은 1개만 등록할 수 있습니다.");
       return false;
     }
 
@@ -738,20 +754,21 @@ function App() {
 
   const totalConsultations = consultations.length;
 
-  const warningConsultations = consultations.filter(
-    (consultation) =>
-      consultation.aiAnalysis?.riskLevel === "주의" ||
-      consultation.aiAnalysis?.riskLevel === "MEDIUM",
-  ).length;
+  const todayAppointmentCount = allAppointments.filter((appointment) => {
+    if (appointment.status === "취소") {
+      return false;
+    }
 
-  const recentConsultations = consultations.filter((consultation) => {
-    const createdAt = new Date(consultation.createdAt);
+    const appointmentDate = new Date(
+      appointment.appointmentDate || appointment.appointmentDateTime,
+    );
     const today = new Date();
 
-    const diffTime = today - createdAt;
-    const diffDays = diffTime / (1000 * 60 * 60 * 24);
-
-    return diffDays <= 7;
+    return (
+      appointmentDate.getFullYear() === today.getFullYear() &&
+      appointmentDate.getMonth() === today.getMonth() &&
+      appointmentDate.getDate() === today.getDate()
+    );
   }).length;
 
   const activeDoctors = doctors.filter((doctor) => doctor.active === true);
@@ -768,32 +785,35 @@ function App() {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-500 shadow-sm">
-          <label htmlFor="ai-model-select" className="font-semibold">
-            AI 모델
-          </label>
-          <select
-            id="ai-model-select"
-            value={aiModel}
-            onChange={changeAiModel}
-            disabled={isAiModelSaving}
-            className="h-7 rounded border border-slate-300 bg-white px-2 text-xs text-slate-700 disabled:bg-slate-100"
-          >
-            {aiModelOptions.map((model) => (
-              <option key={model} value={model}>
-                {model}
-              </option>
-            ))}
-          </select>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <div className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 shadow-sm">
+            <span>환자 {totalPatients}명</span>
+            <span className="text-slate-300">|</span>
+            <span>상담 {totalConsultations}건</span>
+            <span className="text-slate-300">|</span>
+            <span>오늘 예약 {todayAppointmentCount}건</span>
+          </div>
+
+          <div className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-500 shadow-sm">
+            <label htmlFor="ai-model-select" className="font-semibold">
+              AI 모델
+            </label>
+            <select
+              id="ai-model-select"
+              value={aiModel}
+              onChange={changeAiModel}
+              disabled={isAiModelSaving}
+              className="h-7 rounded border border-slate-300 bg-white px-2 text-xs text-slate-700 disabled:bg-slate-100"
+            >
+              {aiModelOptions.map((model) => (
+                <option key={model} value={model}>
+                  {model}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
-
-      <Dashboard
-        totalPatients={totalPatients}
-        totalConsultations={totalConsultations}
-        warningConsultations={warningConsultations}
-        recentConsultations={recentConsultations}
-      />
 
       <section className="mb-3">
         <h2 className="mb-2 text-lg font-bold text-slate-700">
@@ -801,15 +821,28 @@ function App() {
         </h2>
 
         <div className="grid items-stretch grid-cols-[minmax(360px,1fr)_minmax(360px,1fr)_minmax(420px,1.1fr)] gap-3">
-          <PatientList
-            patients={patients}
-            selectedViewPatientId={selectedViewPatientId}
-            selectedPatientId={selectedPatientId}
-            selectedPatient={selectedPatient}
-            onSelectPatient={selectPatientForView}
-            deletePatient={deletePatient}
-            updatePatient={updatePatient}
-          />
+          <div className="flex h-full min-h-0 flex-col gap-3">
+            <PatientForm
+              name={name}
+              phone={phone}
+              birth={birth}
+              setName={setName}
+              setPhone={setPhone}
+              setBirth={setBirth}
+              addPatient={addPatient}
+              compact
+            />
+
+            <PatientList
+              patients={patients}
+              selectedViewPatientId={selectedViewPatientId}
+              selectedPatientId={selectedPatientId}
+              selectedPatient={selectedPatient}
+              onSelectPatient={selectPatientForView}
+              deletePatient={deletePatient}
+              updatePatient={updatePatient}
+            />
+          </div>
 
           <div className="h-full">
             <ConsultationForm
@@ -831,7 +864,7 @@ function App() {
             />
           </div>
 
-          <div className="h-full">
+          <div className="flex h-full flex-col gap-3">
             <AppointmentForm
               selectedPatient={selectedPatient}
               selectedConsultation={selectedConsultation}
@@ -846,6 +879,14 @@ function App() {
               onCreateAppointment={addPatientAppointment}
               isSaving={isAppointmentSaving}
             />
+
+            <AppointmentList
+              selectedPatient={selectedPatient}
+              appointments={selectedPatientAppointments}
+              onUpdateStatus={changePatientAppointmentStatus}
+              onDeleteAppointment={removePatientAppointment}
+              compact
+            />
           </div>
         </div>
       </section>
@@ -856,13 +897,28 @@ function App() {
         </h2>
 
         <div className="grid grid-cols-[minmax(360px,1fr)_minmax(440px,1.15fr)_minmax(420px,1.1fr)] gap-3">
+          <PatientInsight
+            selectedPatient={selectedPatient}
+            consultations={consultations}
+            appointments={selectedPatientAppointments}
+            getRiskColor={getRiskColor}
+            editingId={editingId}
+            editText={editText}
+            setEditText={setEditText}
+            updateConsultation={updateConsultation}
+            deleteConsultation={deleteConsultation}
+            setEditingId={setEditingId}
+            onSelectConsultation={selectConsultation}
+            onDeleteAppointment={removePatientAppointment}
+          />
+
           <ConsultationDetail
             key={selectedConsultation?.id || "empty-detail"}
             selectedConsultation={selectedConsultation}
             getRiskColor={getRiskColor}
             emptyMessage={
               selectedPatient
-                ? "오른쪽 환자 인사이트의 전체 상담 목록에서 상세 보기를 선택하세요."
+                ? "왼쪽 환자 인사이트의 전체 상담 목록에서 상세 보기를 선택하세요."
                 : "환자를 선택하면 상담 상세를 확인할 수 있습니다."
             }
             onBackToList={() => {
@@ -879,19 +935,6 @@ function App() {
             }}
           />
 
-          <PatientInsight
-            selectedPatient={selectedPatient}
-            consultations={consultations}
-            getRiskColor={getRiskColor}
-            editingId={editingId}
-            editText={editText}
-            setEditText={setEditText}
-            updateConsultation={updateConsultation}
-            deleteConsultation={deleteConsultation}
-            setEditingId={setEditingId}
-            onSelectConsultation={selectConsultation}
-          />
-
           <DoctorWeeklyCalendar
             doctors={activeDoctors}
             appointments={allAppointments}
@@ -905,44 +948,24 @@ function App() {
               }));
             }}
             onSelectSlot={selectScheduleSlot}
+            onSelectAppointmentPatient={(patientId) => {
+              if (patientId) {
+                selectPatientForView(patientId);
+              }
+            }}
+            doctorManagement={
+              <DoctorManagement
+                doctors={doctors}
+                onCreateDoctor={addDoctor}
+                onUpdateDoctor={updateDoctor}
+                onDeleteDoctor={deleteDoctor}
+                embedded
+              />
+            }
           />
         </div>
       </section>
 
-      <section className="mt-3">
-        <h2 className="mb-2 text-lg font-bold text-slate-700">
-          관리 영역
-        </h2>
-
-        <div className="space-y-3">
-          <AppointmentList
-            selectedPatient={selectedPatient}
-            appointments={selectedPatientAppointments}
-            onUpdateStatus={changePatientAppointmentStatus}
-            onDeleteAppointment={removePatientAppointment}
-          />
-
-          <div className="grid grid-cols-[minmax(360px,0.8fr)_minmax(520px,1fr)] gap-3">
-            <PatientForm
-              name={name}
-              phone={phone}
-              birth={birth}
-              setName={setName}
-              setPhone={setPhone}
-              setBirth={setBirth}
-              addPatient={addPatient}
-              compact
-            />
-
-            <DoctorManagement
-              doctors={doctors}
-              onCreateDoctor={addDoctor}
-              onUpdateDoctor={updateDoctor}
-              onDeleteDoctor={deleteDoctor}
-            />
-          </div>
-        </div>
-      </section>
     </div>
   );
 }

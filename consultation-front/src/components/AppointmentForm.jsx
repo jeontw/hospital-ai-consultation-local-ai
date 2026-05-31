@@ -14,6 +14,24 @@ function formatDateTimeValue(value) {
   return normalized;
 }
 
+function normalizeDateTimeInputValue(value) {
+  const normalized = formatDateTimeValue(value);
+
+  if (normalized.length < 5) {
+    return normalized;
+  }
+
+  const firstDashIndex = normalized.indexOf("-");
+
+  if (firstDashIndex === -1) {
+    return normalized.slice(0, 4);
+  }
+
+  return `${normalized.slice(0, firstDashIndex).slice(0, 4)}${normalized.slice(
+    firstDashIndex,
+  )}`;
+}
+
 function AppointmentForm({
   selectedPatient,
   selectedConsultation,
@@ -53,7 +71,10 @@ function AppointmentForm({
   ]);
 
   const handleFieldChange = (field) => (event) => {
-    const value = event.target.value;
+    const value =
+      field === "appointmentDate"
+        ? normalizeDateTimeInputValue(event.target.value)
+        : event.target.value;
 
     onChangeDraft(field, value);
   };
@@ -101,6 +122,7 @@ function AppointmentForm({
                 draft?.appointmentDate || draft?.appointmentDateTime || "",
               )}
               onChange={handleFieldChange("appointmentDate")}
+              max="9999-12-31T23:59"
               className="h-10 w-full rounded-md border border-slate-300 px-3 text-base"
               required
             />
