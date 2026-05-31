@@ -1,5 +1,6 @@
 package com.hospital.consultation.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -19,11 +20,18 @@ public class Consultation {
     @Column(columnDefinition = "TEXT")
     private String originalText;
 
+    @Column(name = "nurse_memo", columnDefinition = "TEXT")
+    private String nurseMemo;
+
     @Column(columnDefinition = "LONGTEXT")
+    @JsonIgnore
     private String speakerText;
 
     @Column(columnDefinition = "TEXT")
     private String summary;
+
+    @Column(columnDefinition = "LONGTEXT")
+    private String doctorBriefing;
 
     private String audioPath;
 

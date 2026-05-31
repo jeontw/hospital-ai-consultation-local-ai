@@ -45,29 +45,28 @@ public class ConsultationController {
         Patient patient = patientRepository.findById(patientId)
                 .orElseThrow(() -> new RuntimeException("환자를 찾을 수 없습니다."));
 
-        String originalText = requestDto.getOriginalText();
+        String originalText = trimToNull(requestDto.getOriginalText());
+        String nurseMemo = trimToNull(requestDto.getNurseMemo());
+        String analysisInput = buildAnalysisInput(originalText, nurseMemo);
 
-        if (originalText == null || originalText.isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "상담 내용은 비어 있을 수 없습니다.");
+        if (analysisInput == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "상담 내용 또는 간호사 메모가 필요합니다.");
         }
 
-        String speakerText =
-                aiService.separateSpeakers(originalText);
-
-        String summary = aiService.summarize(originalText);
+        String summary = aiService.summarize(analysisInput);
 
 
         Consultation consultation = new Consultation();
         consultation.setPatient(patient);
         consultation.setOriginalText(originalText);
+        consultation.setNurseMemo(nurseMemo);
         consultation.setAudioPath(requestDto.getAudioPath());
         consultation.setSummary(summary);
         consultation.setCreatedAt(LocalDateTime.now());
-        consultation.setSpeakerText(speakerText);
 
         Consultation savedConsultation = consultationRepository.save(consultation);
 
-        String analysisJson = aiService.analyze(originalText);
+        String analysisJson = aiService.analyze(analysisInput);
 
         AiAnalysisResultDto result =
                 objectMapper.readValue(analysisJson, AiAnalysisResultDto.class);
@@ -80,7 +79,14 @@ public class ConsultationController {
 
         aiAnalysisRepository.save(aiAnalysis);
 
-        return savedConsultation;
+        savedConsultation.setDoctorBriefing(createDoctorBriefing(
+                originalText,
+                nurseMemo,
+                summary,
+                result
+        ));
+
+        return consultationRepository.save(savedConsultation);
     }
 
     @GetMapping
@@ -119,6 +125,9 @@ public class ConsultationController {
         for (Consultation consultation : consultations) {
             prompt.append("- 상담일: ").append(consultation.getCreatedAt()).append("\n");
             prompt.append("상담 내용: ").append(consultation.getOriginalText()).append("\n");
+            if (consultation.getNurseMemo() != null && !consultation.getNurseMemo().isBlank()) {
+                prompt.append("간호사 메모: ").append(consultation.getNurseMemo()).append("\n");
+            }
             prompt.append("AI 요약: ").append(consultation.getSummary()).append("\n");
 
             if (consultation.getAiAnalysis() != null) {
@@ -160,63 +169,74 @@ public class ConsultationController {
     @PostMapping("/upload/{patientId}")
     public Consultation uploadConsultation(
             @PathVariable Long patientId,
-            @RequestParam("file") MultipartFile file
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            @RequestParam(value = "nurseMemo", required = false) String nurseMemo
     ) throws Exception {
 
         Patient patient = patientRepository.findById(patientId)
                 .orElseThrow(() -> new RuntimeException("환자를 찾을 수 없습니다."));
 
-        String uploadDir = System.getProperty("user.dir") + "/uploads/";
+        String originalText = null;
+        String audioPath = null;
+        String trimmedNurseMemo = trimToNull(nurseMemo);
 
-        java.io.File directory = new java.io.File(uploadDir);
+        if (file != null && !file.isEmpty()) {
+            String uploadDir = System.getProperty("user.dir") + "/uploads/";
 
-        if (!directory.exists()) {
-            directory.mkdirs();
-        }
+            java.io.File directory = new java.io.File(uploadDir);
 
-        String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
-
-        String filePath = uploadDir + fileName;
-
-        file.transferTo(new java.io.File(filePath));
-
-        String convertedPath = filePath;
-
-        if (fileName.toLowerCase().endsWith(".m4a")) {
-
-            convertedPath = audioConvertService.convertToMp3(filePath);
-
-            java.io.File originalFile = new java.io.File(filePath);
-
-            if (originalFile.exists()) {
-                originalFile.delete();
-                System.out.println("원본 m4a 파일 삭제 완료: " + filePath);
+            if (!directory.exists()) {
+                directory.mkdirs();
             }
 
-            fileName = new java.io.File(convertedPath).getName();
+            String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
+
+            String filePath = uploadDir + fileName;
+
+            file.transferTo(new java.io.File(filePath));
+
+            String convertedPath = filePath;
+
+            if (fileName.toLowerCase().endsWith(".m4a")) {
+
+                convertedPath = audioConvertService.convertToMp3(filePath);
+
+                java.io.File originalFile = new java.io.File(filePath);
+
+                if (originalFile.exists()) {
+                    originalFile.delete();
+                    System.out.println("원본 m4a 파일 삭제 완료: " + filePath);
+                }
+
+                fileName = new java.io.File(convertedPath).getName();
+            }
+
+            originalText =
+                    trimToNull(localWhisperService.transcribe(
+                            new java.io.File(convertedPath)
+                    ));
+            audioPath = "/uploads/" + fileName;
         }
 
-        String originalText =
-                localWhisperService.transcribe(
-                        new java.io.File(convertedPath)
-                );
+        String analysisInput = buildAnalysisInput(originalText, trimmedNurseMemo);
 
-        String speakerText =
-                aiService.separateSpeakers(originalText);
+        if (analysisInput == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "음성 파일 또는 간호사 메모가 필요합니다.");
+        }
 
-        String summary = aiService.summarize(originalText);
+        String summary = aiService.summarize(analysisInput);
 
         Consultation consultation = new Consultation();
         consultation.setPatient(patient);
         consultation.setOriginalText(originalText);
+        consultation.setNurseMemo(trimmedNurseMemo);
         consultation.setSummary(summary);
-        consultation.setAudioPath("/uploads/" + fileName);
+        consultation.setAudioPath(audioPath);
         consultation.setCreatedAt(LocalDateTime.now());
-        consultation.setSpeakerText(speakerText);
 
         Consultation savedConsultation = consultationRepository.save(consultation);
 
-        String analysisJson = aiService.analyze(originalText);
+        String analysisJson = aiService.analyze(analysisInput);
 
         AiAnalysisResultDto result =
                 objectMapper.readValue(analysisJson, AiAnalysisResultDto.class);
@@ -229,7 +249,14 @@ public class ConsultationController {
 
         aiAnalysisRepository.save(aiAnalysis);
 
-        return savedConsultation;
+        savedConsultation.setDoctorBriefing(createDoctorBriefing(
+                originalText,
+                trimmedNurseMemo,
+                summary,
+                result
+        ));
+
+        return consultationRepository.save(savedConsultation);
     }
 
     @Transactional
@@ -241,16 +268,20 @@ public class ConsultationController {
         Consultation consultation = consultationRepository.findById(consultationId)
                 .orElseThrow(() -> new RuntimeException("상담을 찾을 수 없습니다."));
 
-        String originalText = requestDto.getOriginalText();
+        String originalText = trimToNull(requestDto.getOriginalText());
+        String nurseMemo = requestDto.getNurseMemo() == null
+                ? consultation.getNurseMemo()
+                : trimToNull(requestDto.getNurseMemo());
+        String analysisInput = buildAnalysisInput(originalText, nurseMemo);
+
+        if (analysisInput == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "상담 내용 또는 간호사 메모가 필요합니다.");
+        }
 
         consultation.setOriginalText(originalText);
+        consultation.setNurseMemo(nurseMemo);
 
-        String speakerText =
-                aiService.separateSpeakers(originalText);
-
-        consultation.setSpeakerText(speakerText);
-
-        String summary = aiService.summarize(originalText);
+        String summary = aiService.summarize(analysisInput);
 
         consultation.setSummary(summary);
 
@@ -263,7 +294,7 @@ public class ConsultationController {
             aiAnalysis.setConsultation(savedConsultation);
         }
 
-        String analysisJson = aiService.analyze(originalText);
+        String analysisJson = aiService.analyze(analysisInput);
 
         AiAnalysisResultDto result =
                 objectMapper.readValue(analysisJson, AiAnalysisResultDto.class);
@@ -274,7 +305,14 @@ public class ConsultationController {
 
         aiAnalysisRepository.save(aiAnalysis);
 
-        return savedConsultation;
+        savedConsultation.setDoctorBriefing(createDoctorBriefing(
+                originalText,
+                nurseMemo,
+                summary,
+                result
+        ));
+
+        return consultationRepository.save(savedConsultation);
     }
 
     @Transactional
@@ -306,5 +344,59 @@ public class ConsultationController {
         aiAnalysisRepository.deleteByConsultationId(consultationId);
 
         consultationRepository.delete(consultation);
+    }
+
+    private String trimToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        return value.trim();
+    }
+
+    private String buildAnalysisInput(String originalText, String nurseMemo) {
+        StringBuilder builder = new StringBuilder();
+
+        if (originalText != null && !originalText.isBlank()) {
+            builder.append(originalText.trim());
+        }
+
+        if (nurseMemo != null && !nurseMemo.isBlank()) {
+            if (builder.length() > 0) {
+                builder.append("\n\n");
+            }
+            builder.append("간호사 메모:\n").append(nurseMemo.trim());
+        }
+
+        return builder.length() > 0 ? builder.toString() : null;
+    }
+
+    private String createDoctorBriefing(
+            String originalText,
+            String nurseMemo,
+            String summary,
+            AiAnalysisResultDto analysisResult
+    ) {
+        StringBuilder input = new StringBuilder();
+
+        appendBriefingField(input, "originalText", originalText);
+        appendBriefingField(input, "nurseMemo", nurseMemo);
+        appendBriefingField(input, "summary", summary);
+
+        if (analysisResult != null) {
+            appendBriefingField(input, "symptoms", analysisResult.getSymptoms());
+            appendBriefingField(input, "riskLevel", analysisResult.getRiskLevel());
+            appendBriefingField(input, "keywords", analysisResult.getKeywords());
+        }
+
+        return aiService.createDoctorBriefing(input.toString());
+    }
+
+    private void appendBriefingField(StringBuilder input, String label, String value) {
+        if (value == null || value.isBlank()) {
+            return;
+        }
+
+        input.append(label).append(": ").append(value.trim()).append("\n");
     }
 }

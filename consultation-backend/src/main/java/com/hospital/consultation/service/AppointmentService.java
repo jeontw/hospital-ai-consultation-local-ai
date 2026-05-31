@@ -104,9 +104,9 @@ public class AppointmentService {
 
     public AppointmentDraftDto createAppointmentDraft(Long consultationId) {
         Consultation consultation = getConsultation(consultationId);
-        String consultationText = firstNonBlank(
-                consultation.getSpeakerText(),
-                consultation.getOriginalText()
+        String consultationText = buildConsultationText(
+                consultation.getOriginalText(),
+                consultation.getNurseMemo()
         );
 
         if (consultationText == null) {
@@ -192,13 +192,7 @@ public class AppointmentService {
             draft.setStatus(RESERVED_STATUS);
         }
 
-        if (draft.getMemo() == null || draft.getMemo().isBlank()) {
-            draft.setMemo(buildMemoFromConsultation(consultationText));
-        }
-
-        if (appointmentDateTime == null && shouldFlagRelativeDate(dateText, timeText, consultationText)) {
-            draft.setMemo(appendNeedConfirmation(draft.getMemo(), dateText, timeText));
-        }
+        draft.setMemo(resolveVisitReason(draft, consultationText, dateText, timeText));
 
         return draft;
     }
@@ -473,54 +467,185 @@ public class AppointmentService {
         return null;
     }
 
-    private boolean shouldFlagRelativeDate(String dateText, String timeText, String consultationText) {
-        String normalized = joinNonBlank(" ", dateText, timeText, consultationText);
-        if (normalized == null) {
+    private String resolveVisitReason(
+            AppointmentDraftDto draft,
+            String consultationText,
+            String dateText,
+            String timeText
+    ) {
+        String aiVisitReason = firstNonBlank(
+                draft.getMemo(),
+                draft.getReason(),
+                draft.getPurpose()
+        );
+
+        if (!containsInvalidMemoTerm(aiVisitReason)) {
+            String sanitized = sanitizeVisitReason(aiVisitReason, dateText, timeText);
+            if (sanitized != null && !containsInvalidMemoTerm(sanitized)) {
+                return normalizeVisitReasonSentence(sanitized);
+            }
+        }
+
+        return buildFallbackVisitReason(consultationText);
+    }
+
+    private String sanitizeVisitReason(String value, String dateText, String timeText) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        String sanitized = collapseWhitespace(value);
+        sanitized = removeLiteral(sanitized, dateText);
+        sanitized = removeLiteral(sanitized, timeText);
+
+        String[] removalPatterns = {
+                "\\d{4}\\s*년\\s*\\d{1,2}\\s*월\\s*\\d{1,2}\\s*일",
+                "\\d{1,2}\\s*월\\s*\\d{1,2}\\s*일",
+                "이번\\s*주\\s*[월화수목금토일]요일",
+                "다음\\s*주\\s*[월화수목금토일]요일",
+                "오늘|내일|모레",
+                "(오전|오후)\\s*\\d{1,2}시\\s*\\d{1,2}분",
+                "(오전|오후)\\s*\\d{1,2}시",
+                "\\d{1,2}:\\d{2}",
+                "\\d{1,2}시\\s*\\d{1,2}분",
+                "\\d{1,2}시",
+                "방문\\s*예약\\s*(부탁드립니다|부탁드려요|원합니다|가능합니다|해드리겠습니다)?",
+                "방문\\s*(원합니다|하고\\s*싶습니다|하려고\\s*합니다)",
+                "예약\\s*(부탁드립니다|부탁드려요|원합니다|하고\\s*싶습니다|하려고\\s*합니다|가능합니다|가능할까요|해드리겠습니다|해주세요|해\\s*주세요)?",
+                "증상이\\s*지속되면\\s*진료를\\s*받아보시는\\s*것이\\s*좋겠습니다",
+                "증상이\\s*계속되면\\s*진료를\\s*받아보시는\\s*것이\\s*좋겠습니다",
+                "방문\\s*가능한\\s*시간이\\s*있으실까요",
+                "그\\s*시간으로\\s*진행해드릴까요",
+                "안녕하세요|감사합니다|알겠습니다",
+                "\\b(네|환자|선생님|상담사|간호사|화자명)\\b",
+                "\\b(부탁드립니다|부탁드려요|가능합니다|해드리겠습니다)\\b",
+                "화자\\s*\\d+\\s*[:：]",
+                "[가-힣A-Za-z0-9_ ]{1,12}\\s*[:：]"
+        };
+
+        for (String pattern : removalPatterns) {
+            sanitized = sanitized.replaceAll(pattern, " ");
+        }
+
+        sanitized = sanitized
+                .replaceAll("[,./]+\\s*$", "")
+                .replaceAll("\\s+", " ")
+                .trim();
+
+        if (sanitized.isBlank()) {
+            return null;
+        }
+
+        return sanitized;
+    }
+
+    private boolean containsInvalidMemoTerm(String value) {
+        if (value == null || value.isBlank()) {
             return false;
         }
 
-        String compact = normalized.replace(" ", "");
-        return compact.contains("내일")
-                || compact.contains("모레")
-                || compact.contains("다음주")
-                || compact.contains("이번주")
-                || compact.contains("다음달")
-                || compact.contains("오늘")
-                || compact.contains("요일");
+        String compact = value.replaceAll("\\s+", "");
+        String[] invalidTerms = {
+                "안녕하세요",
+                "예약",
+                "가능합니다",
+                "해드리겠습니다",
+                "알겠습니다",
+                "선생님",
+                "환자",
+                "상담사",
+                "간호사",
+                "감사합니다",
+                "네",
+                "화자명",
+                "방문가능한시간이있으실까요",
+                "그시간으로진행해드릴까요",
+                "증상이지속되면진료를받아보시는것이좋겠습니다",
+                "증상이계속되면진료를받아보시는것이좋겠습니다"
+        };
+
+        for (String invalidTerm : invalidTerms) {
+            if (compact.contains(invalidTerm)) {
+                return true;
+            }
+        }
+
+        return Pattern.compile("화자\\s*\\d+\\s*[:：]").matcher(value).find()
+                || Pattern.compile("(환자|상담사|간호사|선생님)\\s*[:：]").matcher(value).find();
     }
 
-    private String buildMemoFromConsultation(String consultationText) {
+    private String normalizeVisitReasonSentence(String visitReason) {
+        if (visitReason == null || visitReason.isBlank()) {
+            return null;
+        }
+
+        String normalized = collapseWhitespace(visitReason)
+                .replaceAll("[.!?。]+$", "")
+                .trim();
+
+        normalized = normalized.split("[.!?。]", 2)[0].trim();
+
+        if (normalized.contains("상담 희망") || normalized.contains("진료 희망")) {
+            return normalized;
+        }
+
+        if (normalized.endsWith("으로") || normalized.endsWith("로")) {
+            return normalized + " 진료 희망";
+        }
+
+        return normalized + "으로 진료 희망";
+    }
+
+    private String buildFallbackVisitReason(String consultationText) {
         if (consultationText == null || consultationText.isBlank()) {
             return null;
         }
 
-        String firstLine = consultationText.split("\\R", 2)[0].trim();
-        return firstLine;
+        String compact = consultationText.replaceAll("\\s+", "");
+
+        if (containsAny(compact, "잠", "수면", "새벽", "피곤")) {
+            return "수면장애와 피로감으로 진료 희망";
+        }
+
+        if (containsAny(compact, "혈압", "두통", "머리")) {
+            return "혈압 상승과 두통으로 진료 희망";
+        }
+
+        if (containsAny(compact, "기침", "가래", "숨", "호흡")) {
+            return "기침과 가래 증상으로 진료 희망";
+        }
+
+        if (containsAny(compact, "불안", "가슴답답", "스트레스")) {
+            return "불안감 및 가슴 답답함으로 상담 희망";
+        }
+
+        if (containsAny(compact, "어지럼", "어지러움", "눈", "시야")) {
+            return "어지럼증 및 시야 불편으로 진료 희망";
+        }
+
+        return "증상 상담으로 진료 희망";
     }
 
-    private String appendNeedConfirmation(String memo, String dateText, String timeText) {
-        StringBuilder builder = new StringBuilder();
-        if (memo != null && !memo.isBlank()) {
-            builder.append(memo.trim());
+    private boolean containsAny(String value, String... keywords) {
+        if (value == null || value.isBlank()) {
+            return false;
         }
 
-        if (dateText != null && !dateText.isBlank()) {
-            if (builder.length() > 0) {
-                builder.append(". ");
+        for (String keyword : keywords) {
+            if (value.contains(keyword)) {
+                return true;
             }
-            builder.append(dateText.trim());
         }
 
-        if (timeText != null && !timeText.isBlank()) {
-            builder.append(" ").append(timeText.trim());
+        return false;
+    }
+
+    private String removeLiteral(String value, String target) {
+        if (value == null || target == null || target.isBlank()) {
+            return value;
         }
 
-        if (builder.length() > 0) {
-            builder.append(". 정확한 날짜 확인 필요");
-            return builder.toString();
-        }
-
-        return "정확한 날짜 확인 필요";
+        return value.replace(target, " ");
     }
 
     private String normalizeStatus(String status) {
@@ -624,4 +749,22 @@ public class AppointmentService {
     private String collapseWhitespace(String value) {
         return value == null ? null : value.replaceAll("\\s+", " ").trim();
     }
+
+    private String buildConsultationText(String originalText, String nurseMemo) {
+        StringBuilder builder = new StringBuilder();
+
+        if (originalText != null && !originalText.isBlank()) {
+            builder.append(originalText.trim());
+        }
+
+        if (nurseMemo != null && !nurseMemo.isBlank()) {
+            if (builder.length() > 0) {
+                builder.append("\n\n");
+            }
+            builder.append("간호사 메모:\n").append(nurseMemo.trim());
+        }
+
+        return builder.length() > 0 ? builder.toString() : null;
+    }
+
 }

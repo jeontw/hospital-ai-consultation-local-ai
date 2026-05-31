@@ -1,15 +1,47 @@
-import { useState } from "react";
+function parseDoctorBriefing(value) {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === "object") {
+    return value;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return {
+      visitReason: "",
+      mainSymptoms: [],
+      specialNotes: [String(value)],
+      attentionLevel: "",
+      recommendedQuestions: [],
+    };
+  }
+}
+
+function normalizeList(value) {
+  if (Array.isArray(value)) {
+    return value.filter(Boolean);
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    return value
+      .split(/\n|,/)
+      .map((item) => item.replace(/^[-*]\s*/, "").trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
 
 function ConsultationDetail({
   selectedConsultation,
   getRiskColor,
   onOpenInsight,
-  onGenerateAppointmentDraft,
   emptyMessage = "상담을 선택하면 상세 정보가 표시됩니다.",
   onBackToList,
 }) {
-  const [draftLoading, setDraftLoading] = useState(false);
-
   if (!selectedConsultation) {
     return (
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -27,15 +59,16 @@ function ConsultationDetail({
       ? audioPath
       : `http://localhost:8080${audioPath.startsWith("/") ? audioPath : `/${audioPath}`}`
     : "";
-
-  const handleGenerateDraft = async () => {
-    setDraftLoading(true);
-    try {
-      await onGenerateAppointmentDraft?.();
-    } finally {
-      setDraftLoading(false);
-    }
-  };
+  const doctorBriefing = parseDoctorBriefing(selectedConsultation.doctorBriefing);
+  const mainSymptoms = normalizeList(doctorBriefing?.mainSymptoms);
+  const specialNotes = normalizeList(doctorBriefing?.specialNotes);
+  const recommendedQuestions = normalizeList(
+    doctorBriefing?.recommendedQuestions,
+  );
+  const attentionLevel =
+    doctorBriefing?.attentionLevel ||
+    selectedConsultation.aiAnalysis?.riskLevel ||
+    "";
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -51,14 +84,6 @@ function ConsultationDetail({
               목록으로 돌아가기
             </button>
           )}
-
-          <button
-            onClick={handleGenerateDraft}
-            disabled={draftLoading}
-            className="h-9 rounded-md bg-slate-800 px-3 text-sm font-medium text-white disabled:bg-slate-300"
-          >
-            {draftLoading ? "초안 생성 중..." : "예약 초안 생성"}
-          </button>
 
           <button
             onClick={() => onOpenInsight?.(selectedConsultation.patient)}
@@ -100,10 +125,10 @@ function ConsultationDetail({
         </div>
 
         <div>
-          <p className="mb-2 text-lg font-bold text-slate-900">화자 분리 결과</p>
-          <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-md bg-slate-50 p-3 text-base leading-7 text-slate-700">
-            {selectedConsultation.speakerText || "화자 분리 결과 없음"}
-          </pre>
+          <p className="mb-2 text-lg font-bold text-slate-900">간호사 메모</p>
+          <p className="max-h-32 overflow-auto whitespace-pre-wrap rounded-md border border-slate-200 bg-slate-50 p-3 text-base leading-7 text-slate-700">
+            {selectedConsultation.nurseMemo || "메모 없음"}
+          </p>
         </div>
 
         <div>
@@ -111,6 +136,71 @@ function ConsultationDetail({
           <p className="max-h-32 overflow-auto whitespace-pre-wrap rounded-md bg-slate-50 p-3 text-base leading-7 text-slate-700">
             {selectedConsultation.summary || "요약 없음"}
           </p>
+        </div>
+
+        <div className="rounded-md border border-slate-200 bg-white p-3">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <p className="text-lg font-bold text-slate-900">의사용 브리핑</p>
+            <span
+              className={`inline-block rounded-full border px-3 py-1 text-sm font-bold ${getRiskColor(
+                attentionLevel,
+              )}`}
+            >
+              주의도: {attentionLevel || "분석 없음"}
+            </span>
+          </div>
+
+          {doctorBriefing ? (
+            <div className="grid grid-cols-2 gap-3 text-base">
+              <div className="rounded-md bg-slate-50 p-3">
+                <p className="mb-1 font-semibold text-slate-500">방문 사유</p>
+                <p className="text-slate-800">
+                  {doctorBriefing.visitReason || "확인 필요"}
+                </p>
+              </div>
+
+              <div className="rounded-md bg-slate-50 p-3">
+                <p className="mb-1 font-semibold text-slate-500">주요 증상</p>
+                <ul className="list-disc space-y-1 pl-5 text-slate-800">
+                  {(mainSymptoms.length ? mainSymptoms : ["확인 필요"]).map(
+                    (symptom) => (
+                      <li key={symptom}>{symptom}</li>
+                    ),
+                  )}
+                </ul>
+              </div>
+
+              <div className="rounded-md bg-slate-50 p-3">
+                <p className="mb-1 font-semibold text-slate-500">특이사항</p>
+                <ul className="list-disc space-y-1 pl-5 text-slate-800">
+                  {(specialNotes.length ? specialNotes : ["확인 필요"]).map(
+                    (note) => (
+                      <li key={note}>{note}</li>
+                    ),
+                  )}
+                </ul>
+              </div>
+
+              <div className="rounded-md bg-slate-50 p-3">
+                <p className="mb-1 font-semibold text-slate-500">
+                  추천 확인 질문
+                </p>
+                <ul className="list-disc space-y-1 pl-5 text-slate-800">
+                  {(
+                    recommendedQuestions.length
+                      ? recommendedQuestions
+                      : ["증상은 언제부터 시작되었나요?"]
+                  ).map((question) => (
+                    <li key={question}>{question}</li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          ) : (
+            <p className="rounded-md bg-slate-50 p-3 text-base text-slate-500">
+              브리핑 없음
+            </p>
+          )}
         </div>
 
         <div className="grid grid-cols-3 gap-2">

@@ -27,7 +27,7 @@ function AppointmentList({
           <div className="grid h-9 grid-cols-[180px_90px_1fr_190px] items-center gap-2 border-b border-slate-200 bg-slate-50 px-3 text-sm font-semibold text-slate-500">
             <span>예약일시</span>
             <span>상태</span>
-            <span>메모</span>
+            <span>방문 사유</span>
             <span className="text-right">관리</span>
           </div>
 
@@ -47,7 +47,7 @@ function AppointmentList({
                   {appointment.status || "예약됨"}
                 </p>
                 <p className="truncate text-slate-600">
-                  {appointment.memo || "메모 없음"}
+                  {appointment.memo || "방문 사유 없음"}
                 </p>
                 <div className="flex justify-end gap-1.5">
                   <button

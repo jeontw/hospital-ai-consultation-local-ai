@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   getPatients,
@@ -47,6 +47,7 @@ function App() {
   const [audioFile, setAudioFile] = useState(null);
   const [registrationMode, setRegistrationMode] = useState("audio");
   const [consultationText, setConsultationText] = useState("");
+  const [nurseMemo, setNurseMemo] = useState("");
   const [selectedViewPatientId, setSelectedViewPatientId] = useState("");
   const [searchKeyword, setSearchKeyword] = useState("");
   const [editingId, setEditingId] = useState(null);
@@ -70,6 +71,9 @@ function App() {
   const [viewMode, setViewMode] = useState("list");
 
   const fileInputRef = useRef(null);
+  const appointmentDraftCacheRef = useRef(new Map());
+  const appointmentDraftInFlightRef = useRef(new Map());
+  const lastAutoDraftConsultationIdRef = useRef(null);
 
   const fetchPatients = async () => {
     try {
@@ -163,7 +167,7 @@ function App() {
     });
   };
 
-  const applyAppointmentDraft = (draft) => {
+  const applyAppointmentDraft = useCallback((draft) => {
     if (!draft) {
       return;
     }
@@ -175,30 +179,18 @@ function App() {
       memo: draft.memo || "",
       status: draft.status || "예약됨",
     });
-  };
+  }, []);
 
-  const handleGenerateAppointmentDraft = async () => {
-    const draft = await generateAppointmentDraft();
+  const hasAppointmentIntent = useCallback((draft) => {
+    return Boolean(draft?.needReservation || draft?.appointmentConfirmed);
+  }, []);
 
-    if (!draft) {
-      return null;
-    }
-
-    if (!draft.needReservation && !draft.appointmentConfirmed) {
-      alert("상담 내용에서 예약 초안을 찾지 못했습니다.");
-      return null;
-    }
-
-    applyAppointmentDraft(draft);
-    return draft;
-  };
   const selectConsultation = (consultation) => {
     setSelectedConsultation(consultation);
     setSelectedPatient(consultation?.patient || null);
     setViewMode("detail");
     fetchAppointmentsForConsultation(consultation);
     fetchSelectedPatientAppointments(consultation?.patient?.id);
-    clearAppointmentDraft();
   };
 
   const selectPatientForView = async (patientId) => {
@@ -307,13 +299,11 @@ function App() {
       return;
     }
 
-    if (registrationMode === "audio" && !audioFile) {
-      alert("음성 파일을 선택하세요");
-      return;
-    }
+    const trimmedConsultationText = consultationText.trim();
+    const trimmedNurseMemo = nurseMemo.trim();
 
-    if (registrationMode === "text" && !consultationText.trim()) {
-      alert("상담 내용을 입력하세요");
+    if (!audioFile && !trimmedConsultationText && !trimmedNurseMemo) {
+      alert("음성 파일 또는 간호사 메모를 입력하세요");
       return;
     }
 
@@ -322,11 +312,12 @@ function App() {
     try {
       let response;
 
-      if (registrationMode === "audio") {
+      if (audioFile) {
         setLoadingMessage("음성 파일 업로드 중...");
 
         const formData = new FormData();
         formData.append("file", audioFile);
+        formData.append("nurseMemo", trimmedNurseMemo);
         setLoadingMessage("음성 변환 및 STT 분석 중...");
 
         response = await uploadConsultationAudio(selectedPatientId, formData);
@@ -334,7 +325,8 @@ function App() {
         setLoadingMessage("상담 내용 AI 분석 및 저장 중...");
 
         response = await createTextConsultation(selectedPatientId, {
-          originalText: consultationText.trim(),
+          originalText: trimmedConsultationText,
+          nurseMemo: trimmedNurseMemo,
           audioPath: null,
         });
       }
@@ -347,6 +339,7 @@ function App() {
 
       setAudioFile(null);
       setConsultationText("");
+      setNurseMemo("");
 
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
@@ -413,21 +406,93 @@ function App() {
       alert("상담 수정 실패");
     }
   };
-  const generateAppointmentDraft = async () => {
-    if (!selectedConsultation) {
-      alert("상담을 먼저 선택하세요.");
-      return null;
+  const generateAppointmentDraft = useCallback(
+    async (consultation = selectedConsultation, { silent = false } = {}) => {
+      if (!consultation) {
+        if (!silent) {
+          alert("상담을 먼저 선택하세요.");
+        }
+        return null;
+      }
+
+      if (!consultation.originalText?.trim() && !consultation.nurseMemo?.trim()) {
+        return null;
+      }
+
+      const consultationId = consultation.id;
+
+      if (appointmentDraftCacheRef.current.has(consultationId)) {
+        return appointmentDraftCacheRef.current.get(consultationId);
+      }
+
+      if (appointmentDraftInFlightRef.current.has(consultationId)) {
+        return appointmentDraftInFlightRef.current.get(consultationId);
+      }
+
+      const request = createAppointmentDraft(consultationId)
+        .then((response) => {
+          appointmentDraftCacheRef.current.set(consultationId, response.data);
+          return response.data;
+        })
+        .catch((error) => {
+          console.error("AI 예약 초안 생성 실패:", error);
+          if (!silent) {
+            alert("AI 예약 초안 생성 실패");
+          }
+          return null;
+        })
+        .finally(() => {
+          appointmentDraftInFlightRef.current.delete(consultationId);
+        });
+
+      appointmentDraftInFlightRef.current.set(consultationId, request);
+      return request;
+    },
+    [selectedConsultation],
+  );
+
+  useEffect(() => {
+    const consultation = selectedConsultation;
+    const consultationId = consultation?.id;
+
+    if (
+      !consultationId ||
+      (!consultation.originalText?.trim() && !consultation.nurseMemo?.trim())
+    ) {
+      return;
     }
 
-    try {
-      const response = await createAppointmentDraft(selectedConsultation.id);
-      return response.data;
-    } catch (error) {
-      console.error("AI 예약 초안 생성 실패:", error);
-      alert("AI 예약 초안 생성 실패");
-      return null;
+    if (lastAutoDraftConsultationIdRef.current === consultationId) {
+      return;
     }
-  };
+
+    lastAutoDraftConsultationIdRef.current = consultationId;
+
+    let canceled = false;
+
+    const autoFillAppointmentDraft = async () => {
+      const draft = await generateAppointmentDraft(consultation, {
+        silent: true,
+      });
+
+      if (canceled || !hasAppointmentIntent(draft)) {
+        return;
+      }
+
+      applyAppointmentDraft(draft);
+    };
+
+    autoFillAppointmentDraft();
+
+    return () => {
+      canceled = true;
+    };
+  }, [
+    applyAppointmentDraft,
+    generateAppointmentDraft,
+    hasAppointmentIntent,
+    selectedConsultation,
+  ]);
   const addPatientAppointment = async (event) => {
     event.preventDefault();
 
@@ -585,6 +650,8 @@ function App() {
               setAudioFile={setAudioFile}
               consultationText={consultationText}
               setConsultationText={setConsultationText}
+              nurseMemo={nurseMemo}
+              setNurseMemo={setNurseMemo}
               addConsultation={addConsultation}
               fileInputRef={fileInputRef}
               isLoading={isLoading}
@@ -605,7 +672,6 @@ function App() {
               key={selectedConsultation.id}
               selectedConsultation={selectedConsultation}
               getRiskColor={getRiskColor}
-              onGenerateAppointmentDraft={handleGenerateAppointmentDraft}
               onBackToList={() => setViewMode("list")}
               onOpenInsight={(patient) => {
                 setSelectedPatient(patient);

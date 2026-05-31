@@ -7,6 +7,8 @@ function ConsultationForm({
   setAudioFile,
   consultationText,
   setConsultationText,
+  nurseMemo,
+  setNurseMemo,
   addConsultation,
   fileInputRef,
   isLoading,
@@ -78,6 +80,18 @@ function ConsultationForm({
             placeholder="상담 내용을 입력하세요."
           />
         )}
+
+        <div>
+          <label className="mb-1 block text-base font-medium text-slate-700">
+            간호사 메모
+          </label>
+          <textarea
+            value={nurseMemo}
+            onChange={(e) => setNurseMemo(e.target.value)}
+            className="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-base leading-6"
+            placeholder="환자와 통화하며 기록한 메모를 입력하세요."
+          />
+        </div>
 
         <button
           onClick={addConsultation}

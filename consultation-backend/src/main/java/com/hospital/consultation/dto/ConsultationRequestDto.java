@@ -9,6 +9,8 @@ public class ConsultationRequestDto {
 
     private String originalText;
 
+    private String nurseMemo;
+
     private String audioPath;
 
 }

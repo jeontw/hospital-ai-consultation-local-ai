@@ -112,13 +112,13 @@ function AppointmentForm({
 
           <div>
             <label className="mb-1 block text-base font-medium text-slate-700">
-              메모
+              방문 사유
             </label>
             <textarea
               value={draft?.memo || ""}
               onChange={handleFieldChange("memo")}
               className="min-h-24 w-full rounded-md border border-slate-300 px-3 py-2 text-base"
-              placeholder="예약 관련 메모"
+              placeholder="환자의 방문 사유를 입력하세요."
             />
           </div>
 
