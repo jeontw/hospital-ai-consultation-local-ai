@@ -2,9 +2,12 @@ package com.hospital.consultation.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hospital.consultation.dto.AiAnalysisResultDto;
+import com.hospital.consultation.dto.AiConsultationConfirmRequestDto;
+import com.hospital.consultation.dto.AiConsultationConfirmResponseDto;
 import com.hospital.consultation.dto.AiConsultationPreviewDto;
 import com.hospital.consultation.dto.AiPatientExtractionDto;
 import com.hospital.consultation.dto.AppointmentDraftDto;
+import com.hospital.consultation.dto.AppointmentRequestDto;
 import com.hospital.consultation.dto.ConsultationRequestDto;
 import com.hospital.consultation.dto.PatientCandidateDto;
 import com.hospital.consultation.entity.AiAnalysis;
@@ -210,6 +213,8 @@ public class ConsultationController {
         AppointmentDraftDto appointmentDraft =
                 appointmentService.createAppointmentDraftFromText(analysisInput);
         List<PatientCandidateDto> patientCandidates = findPatientCandidates(patientExtraction);
+        PatientRecommendation patientRecommendation =
+                recommendPatient(patientExtraction, patientCandidates);
         DoctorRecommendation doctorRecommendation = recommendDoctor(
                 analysisInput,
                 analysisResult,
@@ -229,6 +234,9 @@ public class ConsultationController {
         preview.setExtractedPhoneLast4(resolvePhoneLast4(patientExtraction));
         preview.setExtractedBirth(patientExtraction.getBirth());
         preview.setPatientCandidates(patientCandidates);
+        preview.setRecommendedPatientId(patientRecommendation.patientId());
+        preview.setRecommendedPatientName(patientRecommendation.patientName());
+        preview.setPatientRecommendationReason(patientRecommendation.reason());
         preview.setAppointmentDate(firstNonBlank(
                 appointmentDraft.getAppointmentDate(),
                 appointmentDraft.getAppointmentDateTime()
@@ -244,6 +252,82 @@ public class ConsultationController {
         preview.setDoctorRecommendationReason(doctorRecommendation.reason());
 
         return preview;
+    }
+
+    @Transactional
+    @PostMapping("/preview/confirm")
+    public AiConsultationConfirmResponseDto confirmPreviewConsultation(
+            @RequestBody AiConsultationConfirmRequestDto requestDto
+    ) throws Exception {
+        if (requestDto.getPatientId() == null) {
+            throw new RuntimeException("환자를 선택해주세요.");
+        }
+
+        Patient patient = patientRepository.findById(requestDto.getPatientId())
+                .orElseThrow(() -> new RuntimeException("환자를 찾을 수 없습니다."));
+
+        String originalText = trimToNull(requestDto.getOriginalText());
+        String nurseMemo = trimToNull(requestDto.getNurseMemo());
+        String summary = trimToNull(requestDto.getSummary());
+        String symptoms = joinListText(requestDto.getSymptoms());
+        String riskLevel = trimToNull(requestDto.getRiskLevel());
+        String keywords = joinListText(requestDto.getKeywords());
+
+        if (buildAnalysisInput(originalText, nurseMemo) == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "상담 내용 또는 간호사 메모가 필요합니다.");
+        }
+
+        Consultation consultation = new Consultation();
+        consultation.setPatient(patient);
+        consultation.setOriginalText(originalText);
+        consultation.setNurseMemo(nurseMemo);
+        consultation.setSummary(summary);
+        consultation.setCreatedAt(LocalDateTime.now());
+        consultation.setDoctorBriefing(createPreviewDoctorBriefing(
+                requestDto.getVisitReason(),
+                summary,
+                symptoms,
+                riskLevel,
+                keywords
+        ));
+
+        Consultation savedConsultation = consultationRepository.save(consultation);
+
+        AiAnalysis aiAnalysis = new AiAnalysis();
+        aiAnalysis.setConsultation(savedConsultation);
+        aiAnalysis.setSymptoms(symptoms);
+        aiAnalysis.setRiskLevel(riskLevel);
+        aiAnalysis.setKeywords(keywords);
+        aiAnalysisRepository.save(aiAnalysis);
+        savedConsultation.setAiAnalysis(aiAnalysis);
+
+        Appointment appointment = null;
+        LocalDateTime appointmentDateTime = firstNonNull(
+                requestDto.getAppointmentDate(),
+                requestDto.getAppointmentDateTime()
+        );
+
+        if (appointmentDateTime != null) {
+            if (requestDto.getDoctorId() == null) {
+                throw new RuntimeException("담당의사를 선택해주세요.");
+            }
+
+            AppointmentRequestDto appointmentRequest = new AppointmentRequestDto();
+            appointmentRequest.setPatientId(patient.getId());
+            appointmentRequest.setConsultationId(savedConsultation.getId());
+            appointmentRequest.setDoctorId(requestDto.getDoctorId());
+            appointmentRequest.setAppointmentDate(appointmentDateTime);
+            appointmentRequest.setStatus(firstNonBlank(requestDto.getStatus(), "예약됨"));
+            appointmentRequest.setPurpose(trimToNull(requestDto.getVisitReason()));
+            appointmentRequest.setMemo(trimToNull(requestDto.getVisitReason()));
+            appointment = appointmentService.createAppointment(appointmentRequest);
+        }
+
+        AiConsultationConfirmResponseDto response = new AiConsultationConfirmResponseDto();
+        response.setConsultation(consultationRepository.findById(savedConsultation.getId())
+                .orElse(savedConsultation));
+        response.setAppointment(appointment);
+        return response;
     }
 
     @PostMapping("/upload/{patientId}")
@@ -573,6 +657,57 @@ public class ConsultationController {
         return candidate;
     }
 
+    private PatientRecommendation recommendPatient(
+            AiPatientExtractionDto extraction,
+            List<PatientCandidateDto> patientCandidates
+    ) {
+        if (patientCandidates == null || patientCandidates.isEmpty()) {
+            return new PatientRecommendation(null, null, "환자 후보가 없습니다.");
+        }
+
+        PatientCandidateDto recommended = patientCandidates.get(0);
+        String phone = normalizePhone(extraction.getPhone());
+        String phoneLast4 = resolvePhoneLast4(extraction);
+        String name = normalizeText(extraction.getName());
+        String birth = normalizeText(extraction.getBirth());
+        String recommendedPhone = normalizePhone(recommended.getPhone());
+        String recommendedName = normalizeText(recommended.getName());
+        String recommendedBirth = normalizeText(recommended.getBirth());
+
+        String reason = "가장 가까운 환자 후보로 추천했습니다.";
+
+        if (phone != null && phone.length() > 4 && phone.equals(recommendedPhone)) {
+            reason = "전체 전화번호가 정확히 일치합니다.";
+        } else if (
+                name != null
+                        && phoneLast4 != null
+                        && name.equals(recommendedName)
+                        && phoneEndsWith(recommended.getPhone(), phoneLast4)
+        ) {
+            reason = "이름과 전화번호 뒷자리 4자리가 일치합니다.";
+        } else if (
+                phoneLast4 != null
+                        && phoneEndsWith(recommended.getPhone(), phoneLast4)
+        ) {
+            reason = "전화번호 뒷자리 4자리가 일치합니다.";
+        } else if (
+                name != null
+                        && birth != null
+                        && name.equals(recommendedName)
+                        && birth.equals(recommendedBirth)
+        ) {
+            reason = "이름과 생년월일이 일치합니다.";
+        } else if (name != null && name.equals(recommendedName)) {
+            reason = "이름이 일치합니다.";
+        }
+
+        return new PatientRecommendation(
+                recommended.getId(),
+                recommended.getName(),
+                reason
+        );
+    }
+
     private DoctorRecommendation recommendDoctor(
             String analysisInput,
             AiAnalysisResultDto analysisResult,
@@ -822,9 +957,49 @@ public class ConsultationController {
         return value.replaceAll("\\s+", "").trim();
     }
 
+    private <T> T firstNonNull(T first, T second) {
+        return first != null ? first : second;
+    }
+
+    private String joinListText(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        return String.join(
+                ", ",
+                splitToList(value)
+        );
+    }
+
+    private String createPreviewDoctorBriefing(
+            String visitReason,
+            String summary,
+            String symptoms,
+            String riskLevel,
+            String keywords
+    ) throws Exception {
+        Map<String, Object> briefing = new LinkedHashMap<>();
+        briefing.put("visitReason", trimToNull(visitReason));
+        briefing.put("mainSymptoms", splitToList(symptoms));
+        briefing.put("specialNotes", splitToList(summary));
+        briefing.put("attentionLevel", trimToNull(riskLevel));
+        briefing.put("recommendedQuestions", List.of());
+        briefing.put("keywords", splitToList(keywords));
+
+        return objectMapper.writeValueAsString(briefing);
+    }
+
     private record DoctorRecommendation(
             Long doctorId,
             String doctorName,
+            String reason
+    ) {
+    }
+
+    private record PatientRecommendation(
+            Long patientId,
+            String patientName,
             String reason
     ) {
     }

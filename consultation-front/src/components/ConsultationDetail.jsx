@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 function parseDoctorBriefing(value) {
   if (!value) {
     return null;
@@ -40,6 +42,10 @@ function ConsultationDetail({
   getRiskColor,
   emptyMessage = "상담을 선택하면 상세 정보가 표시됩니다.",
 }) {
+  const [isDoctorSendOpen, setIsDoctorSendOpen] = useState(false);
+  const [doctorSendText, setDoctorSendText] = useState("");
+  const [isDoctorSendDone, setIsDoctorSendDone] = useState(false);
+
   if (!selectedConsultation) {
     return (
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -76,6 +82,49 @@ function ConsultationDetail({
     doctorBriefing?.attentionLevel ||
     selectedConsultation.aiAnalysis?.riskLevel ||
     "";
+  const buildDoctorSendText = () => {
+    return [
+      "[환자]",
+      `${selectedConsultation.patient?.name || "환자 정보 없음"} / ${
+        selectedConsultation.patient?.phone || "전화번호 없음"
+      } / ${selectedConsultation.patient?.birth || "생년월일 없음"}`,
+      "",
+      "[방문 사유]",
+      doctorBriefing?.visitReason || "확인 필요",
+      "",
+      "[AI 요약]",
+      selectedConsultation.summary || "요약 없음",
+      "",
+      "[주요 증상]",
+      mainSymptoms.length
+        ? mainSymptoms.join(", ")
+        : selectedConsultation.aiAnalysis?.symptoms || "확인 필요",
+      "",
+      "[위험도]",
+      attentionLevel || "확인 필요",
+      "",
+      "[키워드]",
+      selectedConsultation.aiAnalysis?.keywords || "없음",
+      "",
+      "[특이사항]",
+      specialNotes.length ? specialNotes.join("\n") : "확인 필요",
+      "",
+      "[간호사 메모]",
+      selectedConsultation.nurseMemo || "메모 없음",
+    ].join("\n");
+  };
+
+  const openDoctorSend = () => {
+    setDoctorSendText(buildDoctorSendText());
+    setIsDoctorSendOpen(true);
+    setIsDoctorSendDone(false);
+  };
+
+  const sendDoctorBriefing = () => {
+    console.log("상담 상세 의사용 브리핑 전송:", doctorSendText);
+    setIsDoctorSendDone(true);
+    alert("의사에게 브리핑 내용을 전송했습니다.");
+  };
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -129,13 +178,22 @@ function ConsultationDetail({
         <div className="rounded-md border border-slate-200 bg-white p-3">
           <div className="mb-3 flex items-center justify-between gap-2">
             <p className="text-lg font-bold text-slate-900">의사용 브리핑</p>
-            <span
-              className={`inline-block rounded-full border px-3 py-1 text-sm font-bold ${getRiskColor(
-                attentionLevel,
-              )}`}
-            >
-              주의도: {attentionLevel || "분석 없음"}
-            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={openDoctorSend}
+                className="h-8 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+              >
+                의사에게 전송
+              </button>
+              <span
+                className={`inline-block rounded-full border px-3 py-1 text-sm font-bold ${getRiskColor(
+                  attentionLevel,
+                )}`}
+              >
+                주의도: {attentionLevel || "분석 없음"}
+              </span>
+            </div>
           </div>
 
           {doctorBriefing ? (
@@ -188,6 +246,43 @@ function ConsultationDetail({
             <p className="rounded-md bg-slate-50 p-3 text-base text-slate-500">
               브리핑 없음
             </p>
+          )}
+
+          {isDoctorSendOpen && (
+            <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-3">
+              <p className="mb-2 text-sm font-semibold text-amber-800">
+                아래 내용을 의사에게 전송할 예정입니다. 수정하시겠습니까?
+              </p>
+              <textarea
+                value={doctorSendText}
+                onChange={(event) => {
+                  setDoctorSendText(event.target.value);
+                  setIsDoctorSendDone(false);
+                }}
+                className="min-h-40 w-full rounded-md border border-slate-300 bg-white p-3 text-base leading-6"
+              />
+              <div className="mt-2 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDoctorSendOpen(false)}
+                  className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  닫기
+                </button>
+                <button
+                  type="button"
+                  onClick={sendDoctorBriefing}
+                  className="h-9 rounded-md bg-slate-800 px-3 text-sm font-semibold text-white"
+                >
+                  전송합니다
+                </button>
+              </div>
+              {isDoctorSendDone && (
+                <p className="mt-2 text-sm font-semibold text-green-700">
+                  의사에게 전송 완료
+                </p>
+              )}
+            </div>
           )}
         </div>
 

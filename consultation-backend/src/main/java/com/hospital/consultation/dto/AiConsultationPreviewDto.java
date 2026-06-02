@@ -31,6 +31,12 @@ public class AiConsultationPreviewDto {
 
     private List<PatientCandidateDto> patientCandidates;
 
+    private Long recommendedPatientId;
+
+    private String recommendedPatientName;
+
+    private String patientRecommendationReason;
+
     private String appointmentDate;
 
     private String visitReason;

@@ -12,6 +12,7 @@ import {
   createTextConsultation,
   uploadConsultationAudio,
   previewConsultation,
+  confirmConsultationPreview,
   deleteConsultationById,
   updateConsultationById,
 } from "./api/consultationApi";
@@ -74,6 +75,7 @@ function App() {
   const [selectedConsultation, setSelectedConsultation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [isPreviewConfirming, setIsPreviewConfirming] = useState(false);
   const [consultationPreview, setConsultationPreview] = useState(null);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [loadingMessage, setLoadingMessage] = useState("");
@@ -596,12 +598,79 @@ function App() {
       formData.append("nurseMemo", trimmedNurseMemo);
 
       const response = await previewConsultation(formData);
-      setConsultationPreview(response.data);
+      const selectedTargetPatient = patients.find(
+        (patient) => String(patient.id) === String(selectedPatientId),
+      );
+
+      if (!audioFile && selectedTargetPatient) {
+        const patientCandidates = response.data.patientCandidates || [];
+        const hasSelectedPatient = patientCandidates.some(
+          (patient) => String(patient.id) === String(selectedTargetPatient.id),
+        );
+
+        setConsultationPreview({
+          ...response.data,
+          patientCandidates: hasSelectedPatient
+            ? patientCandidates
+            : [selectedTargetPatient, ...patientCandidates],
+          recommendedPatientId: selectedTargetPatient.id,
+          recommendedPatientName: selectedTargetPatient.name,
+          patientRecommendationReason:
+            "파일 없이 미리보기하여 상담 등록 대상 환자를 기본 선택했습니다.",
+        });
+      } else {
+        setConsultationPreview(response.data);
+      }
     } catch (error) {
       console.error("AI 미리보기 실패:", error);
       alert(error.response?.data?.message || "AI 미리보기 실패");
     } finally {
       setIsPreviewLoading(false);
+    }
+  };
+  const confirmAiConsultationPreview = async (payload) => {
+    if (!payload.patientId) {
+      alert("환자를 선택해주세요.");
+      return;
+    }
+
+    if (payload.appointmentDate && !payload.doctorId) {
+      alert("담당의사를 선택해주세요.");
+      return;
+    }
+
+    setIsPreviewConfirming(true);
+
+    try {
+      const response = await confirmConsultationPreview(payload);
+      const consultation = response.data.consultation;
+      const appointment = response.data.appointment;
+      const patientId = consultation?.patient?.id || payload.patientId;
+
+      setConsultationPreview(null);
+      setSelectedViewPatientId(patientId);
+      setSelectedPatientId(patientId);
+      selectConsultation(consultation);
+
+      await fetchConsultations();
+      await fetchPatientConsultations(patientId);
+      await fetchSelectedPatientAppointments(patientId);
+      await fetchAllAppointments();
+
+      if (consultation) {
+        await fetchAppointmentsForConsultation(consultation);
+      }
+
+      alert(
+        appointment
+          ? "상담 및 예약이 등록되었습니다."
+          : "상담이 등록되었습니다.",
+      );
+    } catch (error) {
+      console.error("AI 미리보기 확정 등록 실패:", error);
+      alert(error.response?.data?.message || "상담 등록 실패");
+    } finally {
+      setIsPreviewConfirming(false);
     }
   };
   const deleteConsultation = async (consultationId) => {
@@ -1057,6 +1126,8 @@ function App() {
         <AiConsultationReviewModal
           preview={consultationPreview}
           doctors={activeDoctors}
+          onConfirm={confirmAiConsultationPreview}
+          isConfirming={isPreviewConfirming}
           onClose={() => setConsultationPreview(null)}
         />
       )}

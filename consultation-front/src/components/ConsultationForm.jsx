@@ -42,9 +42,24 @@ function ConsultationForm({
             onChange={(e) => setAudioFile(e.target.files[0] || null)}
             className="w-full rounded-md border border-slate-300 px-3 py-2 text-base file:mr-3 file:rounded-md file:border-0 file:bg-slate-100 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-slate-700"
           />
-          <p className="truncate rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-base text-slate-600">
-            선택 파일명: {audioFile?.name || "선택된 파일 없음"}
-          </p>
+          <div className="flex items-center gap-2">
+            <p className="min-w-0 flex-1 truncate rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-base text-slate-600">
+              선택 파일명: {audioFile?.name || "선택된 파일 없음"}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setAudioFile(null);
+                if (fileInputRef.current) {
+                  fileInputRef.current.value = "";
+                }
+              }}
+              disabled={!audioFile || isLoading || isPreviewLoading}
+              className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+            >
+              파일 해제
+            </button>
+          </div>
         </div>
 
         <div>
