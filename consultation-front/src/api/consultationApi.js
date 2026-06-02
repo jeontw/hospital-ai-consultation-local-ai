@@ -10,20 +10,12 @@ export const getConsultationsByPatient = (patientId) => {
   return axios.get(`${BASE_URL}/consultations/patient/${patientId}`);
 };
 
-export const uploadConsultationAudio = (patientId, formData) => {
-  return axios.post(`${BASE_URL}/consultations/upload/${patientId}`, formData);
-};
-
 export const previewConsultation = (formData) => {
   return axios.post(`${BASE_URL}/consultations/preview`, formData);
 };
 
 export const confirmConsultationPreview = (data) => {
   return axios.post(`${BASE_URL}/consultations/preview/confirm`, data);
-};
-
-export const createTextConsultation = (patientId, data) => {
-  return axios.post(`${BASE_URL}/consultations/${patientId}`, data);
 };
 
 export const deleteConsultationById = (consultationId) => {

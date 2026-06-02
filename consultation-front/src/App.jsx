@@ -9,8 +9,6 @@ import {
 import {
   getConsultations,
   getConsultationsByPatient,
-  createTextConsultation,
-  uploadConsultationAudio,
   previewConsultation,
   confirmConsultationPreview,
   deleteConsultationById,
@@ -73,12 +71,10 @@ function App() {
   const [editingId, setEditingId] = useState(null);
   const [editText, setEditText] = useState("");
   const [selectedConsultation, setSelectedConsultation] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
   const [isPreviewLoading, setIsPreviewLoading] = useState(false);
   const [isPreviewConfirming, setIsPreviewConfirming] = useState(false);
   const [consultationPreview, setConsultationPreview] = useState(null);
   const [selectedPatient, setSelectedPatient] = useState(null);
-  const [loadingMessage, setLoadingMessage] = useState("");
   const [, setConsultationAppointments] = useState([]);
   const [, setPatientAppointments] = useState([]);
   const [allAppointments, setAllAppointments] = useState([]);
@@ -513,69 +509,6 @@ function App() {
     } catch (error) {
       console.error("환자 수정 실패:", error);
       alert("환자 수정 실패");
-    }
-  };
-  const addConsultation = async () => {
-    if (!selectedPatientId) {
-      alert("환자를 선택하세요");
-      return;
-    }
-
-    const trimmedNurseMemo = nurseMemo.trim();
-
-    if (!audioFile && !trimmedNurseMemo) {
-      alert("음성 파일 또는 간호사 메모를 입력하세요");
-      return;
-    }
-
-    setIsLoading(true);
-
-    try {
-      let response;
-
-      if (audioFile) {
-        setLoadingMessage("음성 파일 업로드 중...");
-
-        const formData = new FormData();
-        formData.append("file", audioFile);
-        formData.append("nurseMemo", trimmedNurseMemo);
-        setLoadingMessage("음성 변환 및 STT 분석 중...");
-
-        response = await uploadConsultationAudio(selectedPatientId, formData);
-      } else {
-        setLoadingMessage("상담 내용 AI 분석 및 저장 중...");
-
-        response = await createTextConsultation(selectedPatientId, {
-          originalText: trimmedNurseMemo,
-          nurseMemo: null,
-          audioPath: null,
-        });
-      }
-
-      setLoadingMessage("AI 상담 내용 분석 및 저장 중...");
-
-      alert("상담 등록 성공");
-
-      selectConsultation(response.data);
-
-      setAudioFile(null);
-      setNurseMemo("");
-
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-
-      if (selectedViewPatientId) {
-        fetchPatientConsultations(selectedViewPatientId);
-      } else {
-        fetchConsultations();
-      }
-    } catch (error) {
-      console.error("상담 등록 실패:", error);
-      alert("상담 등록 실패");
-    } finally {
-      setIsLoading(false);
-      setLoadingMessage("");
     }
   };
   const previewAiConsultation = async () => {
@@ -1032,12 +965,9 @@ function App() {
             setAudioFile={setAudioFile}
             nurseMemo={nurseMemo}
             setNurseMemo={setNurseMemo}
-            addConsultation={addConsultation}
             previewAiConsultation={previewAiConsultation}
             fileInputRef={fileInputRef}
-            isLoading={isLoading}
             isPreviewLoading={isPreviewLoading}
-            loadingMessage={loadingMessage}
           />
 
           <AppointmentForm

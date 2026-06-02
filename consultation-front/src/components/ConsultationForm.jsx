@@ -5,12 +5,9 @@ function ConsultationForm({
   setAudioFile,
   nurseMemo,
   setNurseMemo,
-  addConsultation,
   previewAiConsultation,
   fileInputRef,
-  isLoading,
   isPreviewLoading,
-  loadingMessage,
 }) {
   const selectedPatient = patients.find(
     (patient) => String(patient.id) === String(selectedPatientId),
@@ -54,7 +51,7 @@ function ConsultationForm({
                   fileInputRef.current.value = "";
                 }
               }}
-              disabled={!audioFile || isLoading || isPreviewLoading}
+              disabled={!audioFile || isPreviewLoading}
               className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
             >
               파일 해제
@@ -74,35 +71,21 @@ function ConsultationForm({
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={previewAiConsultation}
-            disabled={isLoading || isPreviewLoading}
-            className={`h-10 rounded-md px-4 text-base font-semibold transition ${
-              isLoading || isPreviewLoading
-                ? "cursor-not-allowed bg-slate-200 text-slate-500"
-                : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
-            }`}
-          >
-            {isPreviewLoading ? "미리보기 중..." : "AI 미리보기"}
-          </button>
+        <button
+          onClick={previewAiConsultation}
+          disabled={isPreviewLoading}
+          className={`h-10 rounded-md px-4 text-base font-semibold text-white transition ${
+            isPreviewLoading
+              ? "cursor-not-allowed bg-slate-400"
+              : "bg-slate-800 hover:bg-slate-700"
+          }`}
+        >
+          {isPreviewLoading ? "처리 중..." : "상담 등록"}
+        </button>
 
-          <button
-            onClick={addConsultation}
-            disabled={isLoading || isPreviewLoading}
-            className={`h-10 rounded-md px-4 text-base font-semibold text-white transition ${
-              isLoading || isPreviewLoading
-                ? "cursor-not-allowed bg-slate-400"
-                : "bg-slate-800 hover:bg-slate-700"
-            }`}
-          >
-            {isLoading ? "처리 중..." : "상담 등록"}
-          </button>
-        </div>
-
-        {isLoading && (
+        {isPreviewLoading && (
           <p className="text-base font-medium text-slate-600">
-            {loadingMessage || "AI 분석 중입니다..."}
+            AI 분석 후 상담 등록 확인 창을 준비 중입니다...
           </p>
         )}
       </div>
