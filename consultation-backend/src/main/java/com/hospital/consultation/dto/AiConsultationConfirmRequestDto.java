@@ -32,4 +32,6 @@ public class AiConsultationConfirmRequestDto {
     private String visitReason;
 
     private String status;
+
+    private String audioPath;
 }

@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 
 function toInputList(value) {
   if (Array.isArray(value)) {
@@ -35,7 +35,6 @@ function AiConsultationReviewModal({
     keywords: toInputList(preview.keywords),
     appointmentDate: preview.appointmentDate || "",
     visitReason: preview.visitReason || "",
-    status: preview.status || "예약됨",
     doctorId: preview.recommendedDoctorId ? String(preview.recommendedDoctorId) : "",
   });
   const updateField = (field, value) => {
@@ -74,7 +73,7 @@ function AiConsultationReviewModal({
       keywords: form.keywords,
       appointmentDate: form.appointmentDate || null,
       visitReason: form.visitReason,
-      status: "예약됨",
+      audioPath: preview.audioPath || "",
     });
   };
 
@@ -195,12 +194,6 @@ function AiConsultationReviewModal({
                 value={form.visitReason}
                 onChange={(event) => updateField("visitReason", event.target.value)}
                 placeholder="방문 사유"
-                className="mt-2 h-10 w-full rounded-md border border-slate-300 px-3 text-base"
-              />
-              <input
-                value={form.status}
-                onChange={(event) => updateField("status", event.target.value)}
-                placeholder="예약 상태"
                 className="mt-2 h-10 w-full rounded-md border border-slate-300 px-3 text-base"
               />
             </div>

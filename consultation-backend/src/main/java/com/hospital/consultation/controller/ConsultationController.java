@@ -193,10 +193,13 @@ public class ConsultationController {
         MultipartFile selectedFile = audioFile != null ? audioFile : file;
         String originalText = trimToNull(directText);
         String trimmedNurseMemo = trimToNull(nurseMemo);
+        String audioPath = null;
 
         if (selectedFile != null && !selectedFile.isEmpty()) {
-            String transcribedText = transcribeTemporaryAudio(selectedFile);
+            PreviewAudioResult previewAudio = storePreviewAudio(selectedFile);
+            String transcribedText = previewAudio.originalText();
             originalText = joinNonBlank("\n\n", originalText, transcribedText);
+            audioPath = previewAudio.audioPath();
         }
 
         String analysisInput = buildAnalysisInput(originalText, trimmedNurseMemo);
@@ -226,6 +229,7 @@ public class ConsultationController {
         preview.setOriginalText(originalText);
         preview.setNurseMemo(trimmedNurseMemo);
         preview.setSummary(summary);
+        preview.setAudioPath(audioPath);
         preview.setSymptoms(splitToList(analysisResult.getSymptoms()));
         preview.setRiskLevel(analysisResult.getRiskLevel());
         preview.setKeywords(splitToList(analysisResult.getKeywords()));
@@ -282,6 +286,7 @@ public class ConsultationController {
         consultation.setOriginalText(originalText);
         consultation.setNurseMemo(nurseMemo);
         consultation.setSummary(summary);
+        consultation.setAudioPath(trimToNull(requestDto.getAudioPath()));
         consultation.setCreatedAt(LocalDateTime.now());
         consultation.setDoctorBriefing(createPreviewDoctorBriefing(
                 requestDto.getVisitReason(),
@@ -535,7 +540,7 @@ public class ConsultationController {
         return builder.length() > 0 ? builder.toString() : null;
     }
 
-    private String transcribeTemporaryAudio(MultipartFile file) throws Exception {
+    private PreviewAudioResult storePreviewAudio(MultipartFile file) throws Exception {
         String uploadDir = System.getProperty("user.dir") + "/uploads/";
         java.io.File directory = new java.io.File(uploadDir);
 
@@ -549,18 +554,15 @@ public class ConsultationController {
 
         file.transferTo(new java.io.File(filePath));
 
-        try {
-            if (fileName.toLowerCase().endsWith(".m4a")) {
-                convertedPath = audioConvertService.convertToMp3(filePath);
-            }
-
-            return trimToNull(localWhisperService.transcribe(new java.io.File(convertedPath)));
-        } finally {
+        if (fileName.toLowerCase().endsWith(".m4a")) {
+            convertedPath = audioConvertService.convertToMp3(filePath);
             deleteIfExists(filePath);
-            if (!convertedPath.equals(filePath)) {
-                deleteIfExists(convertedPath);
-            }
+            fileName = new java.io.File(convertedPath).getName();
         }
+
+        String originalText = trimToNull(localWhisperService.transcribe(new java.io.File(convertedPath)));
+        String audioPath = "/uploads/" + fileName;
+        return new PreviewAudioResult(originalText, audioPath);
     }
 
     private void deleteIfExists(String path) {
@@ -568,6 +570,9 @@ public class ConsultationController {
         if (target.exists()) {
             target.delete();
         }
+    }
+
+    private record PreviewAudioResult(String originalText, String audioPath) {
     }
 
     private AiPatientExtractionDto parsePatientExtraction(String patientJson) {

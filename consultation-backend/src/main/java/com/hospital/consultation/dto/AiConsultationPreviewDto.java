@@ -15,6 +15,8 @@ public class AiConsultationPreviewDto {
 
     private String summary;
 
+    private String audioPath;
+
     private List<String> symptoms;
 
     private String riskLevel;
