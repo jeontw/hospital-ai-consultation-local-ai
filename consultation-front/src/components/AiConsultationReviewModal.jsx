@@ -8,7 +8,7 @@ function toInputList(value) {
   return value || "";
 }
 
-function AiConsultationReviewModal({ preview, onClose }) {
+function AiConsultationReviewModal({ preview, doctors = [], onClose }) {
   const [form, setForm] = useState({
     extractedPatientName: preview.extractedPatientName || "",
     extractedPhoneLast4: preview.extractedPhoneLast4 || "",
@@ -22,6 +22,7 @@ function AiConsultationReviewModal({ preview, onClose }) {
     appointmentDate: preview.appointmentDate || "",
     visitReason: preview.visitReason || "",
     status: preview.status || "예약됨",
+    doctorId: preview.recommendedDoctorId ? String(preview.recommendedDoctorId) : "",
   });
 
   const updateField = (field, value) => {
@@ -99,6 +100,26 @@ function AiConsultationReviewModal({ preview, onClose }) {
 
             <div className="rounded-md border border-slate-200 p-3">
               <h3 className="mb-2 text-base font-bold text-slate-900">예약 정보</h3>
+              <div className="mb-2 rounded-md bg-slate-50 p-3 text-sm text-slate-700">
+                <p className="font-semibold text-slate-900">
+                  추천 담당의사: {preview.recommendedDoctorName || "미지정"}
+                </p>
+                <p className="mt-1">
+                  추천 이유: {preview.doctorRecommendationReason || "추천 근거 없음"}
+                </p>
+              </div>
+              <select
+                value={form.doctorId}
+                onChange={(event) => updateField("doctorId", event.target.value)}
+                className="mb-2 h-10 w-full rounded-md border border-slate-300 px-3 text-base"
+              >
+                <option value="">담당의사 직접 선택</option>
+                {doctors.map((doctor) => (
+                  <option key={doctor.id} value={doctor.id}>
+                    {doctor.name} {doctor.specialty ? `(${doctor.specialty})` : ""}
+                  </option>
+                ))}
+              </select>
               <input
                 value={form.appointmentDate}
                 onChange={(event) =>

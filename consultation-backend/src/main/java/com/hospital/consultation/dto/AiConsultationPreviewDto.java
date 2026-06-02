@@ -36,4 +36,10 @@ public class AiConsultationPreviewDto {
     private String visitReason;
 
     private String status;
+
+    private Long recommendedDoctorId;
+
+    private String recommendedDoctorName;
+
+    private String doctorRecommendationReason;
 }

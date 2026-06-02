@@ -8,11 +8,14 @@ import com.hospital.consultation.dto.AppointmentDraftDto;
 import com.hospital.consultation.dto.ConsultationRequestDto;
 import com.hospital.consultation.dto.PatientCandidateDto;
 import com.hospital.consultation.entity.AiAnalysis;
+import com.hospital.consultation.entity.Appointment;
 import com.hospital.consultation.entity.Consultation;
+import com.hospital.consultation.entity.Doctor;
 import com.hospital.consultation.entity.Patient;
 import com.hospital.consultation.repository.AiAnalysisRepository;
 import com.hospital.consultation.repository.AppointmentRepository;
 import com.hospital.consultation.repository.ConsultationRepository;
+import com.hospital.consultation.repository.DoctorRepository;
 import com.hospital.consultation.repository.PatientRepository;
 import com.hospital.consultation.service.LocalWhisperService;
 import lombok.RequiredArgsConstructor;
@@ -43,6 +46,7 @@ public class ConsultationController {
     private final LocalWhisperService localWhisperService;
     private final AiAnalysisRepository aiAnalysisRepository;
     private final AppointmentRepository appointmentRepository;
+    private final DoctorRepository doctorRepository;
     private final ObjectMapper objectMapper;
     private final AudioConvertService audioConvertService;
     private final AppointmentService appointmentService;
@@ -205,6 +209,13 @@ public class ConsultationController {
                 parsePatientExtraction(aiService.extractPatientProfile(analysisInput));
         AppointmentDraftDto appointmentDraft =
                 appointmentService.createAppointmentDraftFromText(analysisInput);
+        List<PatientCandidateDto> patientCandidates = findPatientCandidates(patientExtraction);
+        DoctorRecommendation doctorRecommendation = recommendDoctor(
+                analysisInput,
+                analysisResult,
+                appointmentDraft,
+                patientCandidates
+        );
 
         AiConsultationPreviewDto preview = new AiConsultationPreviewDto();
         preview.setOriginalText(originalText);
@@ -217,7 +228,7 @@ public class ConsultationController {
         preview.setExtractedPhone(patientExtraction.getPhone());
         preview.setExtractedPhoneLast4(resolvePhoneLast4(patientExtraction));
         preview.setExtractedBirth(patientExtraction.getBirth());
-        preview.setPatientCandidates(findPatientCandidates(patientExtraction));
+        preview.setPatientCandidates(patientCandidates);
         preview.setAppointmentDate(firstNonBlank(
                 appointmentDraft.getAppointmentDate(),
                 appointmentDraft.getAppointmentDateTime()
@@ -228,6 +239,9 @@ public class ConsultationController {
                 appointmentDraft.getReason()
         ));
         preview.setStatus(appointmentDraft.getStatus());
+        preview.setRecommendedDoctorId(doctorRecommendation.doctorId());
+        preview.setRecommendedDoctorName(doctorRecommendation.doctorName());
+        preview.setDoctorRecommendationReason(doctorRecommendation.reason());
 
         return preview;
     }
@@ -559,6 +573,167 @@ public class ConsultationController {
         return candidate;
     }
 
+    private DoctorRecommendation recommendDoctor(
+            String analysisInput,
+            AiAnalysisResultDto analysisResult,
+            AppointmentDraftDto appointmentDraft,
+            List<PatientCandidateDto> patientCandidates
+    ) {
+        List<Doctor> activeDoctors = doctorRepository.findAll().stream()
+                .filter(doctor -> !Boolean.FALSE.equals(doctor.getActive()))
+                .toList();
+
+        if (activeDoctors.isEmpty()) {
+            return new DoctorRecommendation(null, null, "등록된 활성 담당의사가 없습니다.");
+        }
+
+        String recommendationText = joinNonBlank(
+                " ",
+                analysisInput,
+                analysisResult.getSymptoms(),
+                analysisResult.getKeywords(),
+                appointmentDraft.getMemo(),
+                appointmentDraft.getPurpose(),
+                appointmentDraft.getReason()
+        );
+
+        Doctor mentionedDoctor = findMentionedDoctor(recommendationText, activeDoctors);
+        if (mentionedDoctor != null) {
+            return new DoctorRecommendation(
+                    mentionedDoctor.getId(),
+                    mentionedDoctor.getName(),
+                    "상담 내용에서 담당의사명이 직접 언급되었습니다."
+            );
+        }
+
+        SpecialtyRecommendation specialtyRecommendation =
+                recommendSpecialty(recommendationText);
+        if (specialtyRecommendation.specialty() != null) {
+            Doctor specialtyDoctor = findDoctorBySpecialty(
+                    specialtyRecommendation.specialty(),
+                    activeDoctors
+            );
+
+            if (specialtyDoctor != null) {
+                return new DoctorRecommendation(
+                        specialtyDoctor.getId(),
+                        specialtyDoctor.getName(),
+                        specialtyRecommendation.reason()
+                );
+            }
+        }
+
+        Doctor previousDoctor = findPreviousDoctor(patientCandidates, activeDoctors);
+        if (previousDoctor != null) {
+            return new DoctorRecommendation(
+                    previousDoctor.getId(),
+                    previousDoctor.getName(),
+                    "현재 증상만으로 판단이 어려워 과거 예약 담당의사를 참고했습니다."
+            );
+        }
+
+        return new DoctorRecommendation(null, null, "담당의사 추천 근거가 부족해 미지정으로 표시합니다.");
+    }
+
+    private Doctor findMentionedDoctor(String text, List<Doctor> doctors) {
+        if (text == null || text.isBlank()) {
+            return null;
+        }
+
+        String normalizedText = normalizeText(text);
+
+        for (Doctor doctor : doctors) {
+            String doctorName = normalizeText(doctor.getName());
+            if (doctorName != null && normalizedText.contains(doctorName)) {
+                return doctor;
+            }
+        }
+
+        return null;
+    }
+
+    private SpecialtyRecommendation recommendSpecialty(String text) {
+        String normalizedText = normalizeText(text);
+        if (normalizedText == null) {
+            return new SpecialtyRecommendation(null, null);
+        }
+
+        if (containsAny(normalizedText, "두통", "어지럼", "어지러", "편두통", "마비", "저림")) {
+            return new SpecialtyRecommendation("신경과", "두통, 어지럼 등 신경과 관련 증상이 확인되었습니다.");
+        }
+
+        if (containsAny(normalizedText, "기침", "가래", "호흡곤란", "숨참", "발열", "감기")) {
+            return new SpecialtyRecommendation("내과", "기침, 가래, 호흡곤란 등 내과 관련 증상이 확인되었습니다.");
+        }
+
+        if (containsAny(normalizedText, "허리", "무릎", "어깨", "관절", "통증", "삐끗", "골절")) {
+            return new SpecialtyRecommendation("정형외과", "허리, 무릎, 어깨 통증 등 정형외과 관련 증상이 확인되었습니다.");
+        }
+
+        return new SpecialtyRecommendation(null, null);
+    }
+
+    private Doctor findDoctorBySpecialty(String specialty, List<Doctor> doctors) {
+        String normalizedSpecialty = normalizeText(specialty);
+
+        for (Doctor doctor : doctors) {
+            String doctorSpecialty = normalizeText(doctor.getSpecialty());
+            if (
+                    doctorSpecialty != null
+                            && normalizedSpecialty != null
+                            && doctorSpecialty.contains(normalizedSpecialty)
+            ) {
+                return doctor;
+            }
+        }
+
+        return null;
+    }
+
+    private Doctor findPreviousDoctor(
+            List<PatientCandidateDto> patientCandidates,
+            List<Doctor> activeDoctors
+    ) {
+        if (patientCandidates == null || patientCandidates.isEmpty()) {
+            return null;
+        }
+
+        Map<Long, Doctor> activeDoctorMap = new LinkedHashMap<>();
+        for (Doctor doctor : activeDoctors) {
+            activeDoctorMap.put(doctor.getId(), doctor);
+        }
+
+        for (PatientCandidateDto candidate : patientCandidates) {
+            List<Appointment> appointments = appointmentRepository.findByPatientId(candidate.getId());
+
+            for (Appointment appointment : appointments) {
+                Long doctorId = appointment.getDoctor() == null
+                        ? null
+                        : appointment.getDoctor().getId();
+
+                if (doctorId != null && activeDoctorMap.containsKey(doctorId)) {
+                    return activeDoctorMap.get(doctorId);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private boolean containsAny(String text, String... keywords) {
+        if (text == null || text.isBlank()) {
+            return false;
+        }
+
+        for (String keyword : keywords) {
+            if (text.contains(keyword)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private List<String> splitToList(String value) {
         if (value == null || value.isBlank()) {
             return List.of();
@@ -645,6 +820,19 @@ public class ConsultationController {
         }
 
         return value.replaceAll("\\s+", "").trim();
+    }
+
+    private record DoctorRecommendation(
+            Long doctorId,
+            String doctorName,
+            String reason
+    ) {
+    }
+
+    private record SpecialtyRecommendation(
+            String specialty,
+            String reason
+    ) {
     }
 
     private String createDoctorBriefing(

@@ -1056,6 +1056,7 @@ function App() {
       {consultationPreview && (
         <AiConsultationReviewModal
           preview={consultationPreview}
+          doctors={activeDoctors}
           onClose={() => setConsultationPreview(null)}
         />
       )}
