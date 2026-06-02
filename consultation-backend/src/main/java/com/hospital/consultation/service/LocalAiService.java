@@ -64,12 +64,15 @@ public class LocalAiService implements AiService {
                 {
                   "name": "patient name or null",
                   "phone": "phone number or null",
+                  "phoneLast4": "last 4 phone digits or null",
                   "birth": "yyyy-MM-dd birth date or null"
                 }
 
                 Rules:
                 - Use null when a field is not clearly present.
                 - Normalize phone numbers with hyphens when possible.
+                - If only the last 4 phone digits are mentioned, set phone to null and phoneLast4 to those 4 digits.
+                - If the full phone number is mentioned, also set phoneLast4 to the final 4 digits.
                 - Normalize birth to yyyy-MM-dd when possible.
                 - Do not guess missing values.
 

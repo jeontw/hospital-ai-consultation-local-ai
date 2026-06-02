@@ -8,6 +8,18 @@ function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function matchesPhoneSearch(patientPhone, searchPhone) {
+  if (!searchPhone) {
+    return true;
+  }
+
+  if (searchPhone.length === 4) {
+    return patientPhone.endsWith(searchPhone);
+  }
+
+  return patientPhone.includes(searchPhone);
+}
+
 function PatientList({
   patients,
   selectedViewPatientId,
@@ -40,8 +52,7 @@ function PatientList({
 
         return (
           (!normalizedSearchName || patientName.includes(normalizedSearchName)) &&
-          (!normalizedSearchPhone ||
-            patientPhone.includes(normalizedSearchPhone)) &&
+          matchesPhoneSearch(patientPhone, normalizedSearchPhone) &&
           (!normalizedSearchBirth || patientBirth.includes(normalizedSearchBirth))
         );
       })

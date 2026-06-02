@@ -11,5 +11,7 @@ public class AiPatientExtractionDto {
 
     private String phone;
 
+    private String phoneLast4;
+
     private String birth;
 }

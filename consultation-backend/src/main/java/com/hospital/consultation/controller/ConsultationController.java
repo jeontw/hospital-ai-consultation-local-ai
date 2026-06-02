@@ -215,6 +215,7 @@ public class ConsultationController {
         preview.setKeywords(splitToList(analysisResult.getKeywords()));
         preview.setExtractedPatientName(patientExtraction.getName());
         preview.setExtractedPhone(patientExtraction.getPhone());
+        preview.setExtractedPhoneLast4(resolvePhoneLast4(patientExtraction));
         preview.setExtractedBirth(patientExtraction.getBirth());
         preview.setPatientCandidates(findPatientCandidates(patientExtraction));
         preview.setAppointmentDate(firstNonBlank(
@@ -477,6 +478,7 @@ public class ConsultationController {
                     objectMapper.readValue(patientJson, AiPatientExtractionDto.class);
             extraction.setName(trimToNull(extraction.getName()));
             extraction.setPhone(trimToNull(extraction.getPhone()));
+            extraction.setPhoneLast4(trimToNull(extraction.getPhoneLast4()));
             extraction.setBirth(trimToNull(extraction.getBirth()));
             return extraction;
         } catch (Exception ignored) {
@@ -492,13 +494,35 @@ public class ConsultationController {
         }
 
         String phone = normalizePhone(extraction.getPhone());
+        String phoneLast4 = resolvePhoneLast4(extraction);
         String name = normalizeText(extraction.getName());
         String birth = normalizeText(extraction.getBirth());
         List<Patient> patients = patientRepository.findAll();
 
-        if (phone != null) {
+        boolean hasFullPhone = phone != null && phone.length() > 4;
+
+        if (hasFullPhone) {
             for (Patient patient : patients) {
                 if (phone.equals(normalizePhone(patient.getPhone()))) {
+                    candidates.put(patient.getId(), toPatientCandidate(patient));
+                }
+            }
+        }
+
+        if (!hasFullPhone && name != null && phoneLast4 != null) {
+            for (Patient patient : patients) {
+                if (
+                        name.equals(normalizeText(patient.getName()))
+                                && phoneEndsWith(patient.getPhone(), phoneLast4)
+                ) {
+                    candidates.put(patient.getId(), toPatientCandidate(patient));
+                }
+            }
+        }
+
+        if (!hasFullPhone && phoneLast4 != null) {
+            for (Patient patient : patients) {
+                if (phoneEndsWith(patient.getPhone(), phoneLast4)) {
                     candidates.put(patient.getId(), toPatientCandidate(patient));
                 }
             }
@@ -585,6 +609,34 @@ public class ConsultationController {
 
         String digits = value.replaceAll("\\D", "");
         return digits.isBlank() ? null : digits;
+    }
+
+    private String resolvePhoneLast4(AiPatientExtractionDto extraction) {
+        if (extraction == null) {
+            return null;
+        }
+
+        String last4 = normalizePhone(extraction.getPhoneLast4());
+        if (last4 != null && last4.length() >= 4) {
+            return last4.substring(last4.length() - 4);
+        }
+
+        String phone = normalizePhone(extraction.getPhone());
+        if (phone != null && phone.length() >= 4) {
+            return phone.substring(phone.length() - 4);
+        }
+
+        return null;
+    }
+
+    private boolean phoneEndsWith(String phone, String last4) {
+        String normalizedPhone = normalizePhone(phone);
+        String normalizedLast4 = normalizePhone(last4);
+
+        return normalizedPhone != null
+                && normalizedLast4 != null
+                && normalizedLast4.length() == 4
+                && normalizedPhone.endsWith(normalizedLast4);
     }
 
     private String normalizeText(String value) {

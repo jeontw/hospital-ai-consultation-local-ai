@@ -11,7 +11,7 @@ function toInputList(value) {
 function AiConsultationReviewModal({ preview, onClose }) {
   const [form, setForm] = useState({
     extractedPatientName: preview.extractedPatientName || "",
-    extractedPhone: preview.extractedPhone || "",
+    extractedPhoneLast4: preview.extractedPhoneLast4 || "",
     extractedBirth: preview.extractedBirth || "",
     originalText: preview.originalText || "",
     nurseMemo: preview.nurseMemo || "",
@@ -49,7 +49,7 @@ function AiConsultationReviewModal({ preview, onClose }) {
           <div className="space-y-3">
             <div className="rounded-md border border-slate-200 p-3">
               <h3 className="mb-2 text-base font-bold text-slate-900">환자 정보</h3>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 gap-2">
                 <input
                   value={form.extractedPatientName}
                   onChange={(event) =>
@@ -59,11 +59,11 @@ function AiConsultationReviewModal({ preview, onClose }) {
                   className="h-10 rounded-md border border-slate-300 px-3 text-base"
                 />
                 <input
-                  value={form.extractedPhone}
+                  value={form.extractedPhoneLast4}
                   onChange={(event) =>
-                    updateField("extractedPhone", event.target.value)
+                    updateField("extractedPhoneLast4", event.target.value)
                   }
-                  placeholder="전화번호"
+                  placeholder="추출된 전화번호 뒷자리"
                   className="h-10 rounded-md border border-slate-300 px-3 text-base"
                 />
                 <input

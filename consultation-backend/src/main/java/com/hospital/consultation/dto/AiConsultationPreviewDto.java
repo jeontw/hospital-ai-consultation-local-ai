@@ -25,6 +25,8 @@ public class AiConsultationPreviewDto {
 
     private String extractedPhone;
 
+    private String extractedPhoneLast4;
+
     private String extractedBirth;
 
     private List<PatientCandidateDto> patientCandidates;
