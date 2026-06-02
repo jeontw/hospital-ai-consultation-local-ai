@@ -11,6 +11,7 @@ import {
   getConsultationsByPatient,
   createTextConsultation,
   uploadConsultationAudio,
+  previewConsultation,
   deleteConsultationById,
   updateConsultationById,
 } from "./api/consultationApi";
@@ -39,6 +40,7 @@ import PatientInsight from "./components/PatientInsight";
 import AppointmentForm from "./components/AppointmentForm";
 import DoctorWeeklyCalendar from "./components/DoctorWeeklyCalendar";
 import DoctorManagement from "./components/DoctorManagement";
+import AiConsultationReviewModal from "./components/AiConsultationReviewModal";
 
 function getTodayDateInputValue() {
   const now = new Date();
@@ -71,6 +73,8 @@ function App() {
   const [editText, setEditText] = useState("");
   const [selectedConsultation, setSelectedConsultation] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isPreviewLoading, setIsPreviewLoading] = useState(false);
+  const [consultationPreview, setConsultationPreview] = useState(null);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [loadingMessage, setLoadingMessage] = useState("");
   const [, setConsultationAppointments] = useState([]);
@@ -572,6 +576,34 @@ function App() {
       setLoadingMessage("");
     }
   };
+  const previewAiConsultation = async () => {
+    const trimmedNurseMemo = nurseMemo.trim();
+
+    if (!audioFile && !trimmedNurseMemo) {
+      alert("음성 파일 또는 간호사 메모를 입력하세요");
+      return;
+    }
+
+    setIsPreviewLoading(true);
+
+    try {
+      const formData = new FormData();
+
+      if (audioFile) {
+        formData.append("audioFile", audioFile);
+      }
+
+      formData.append("nurseMemo", trimmedNurseMemo);
+
+      const response = await previewConsultation(formData);
+      setConsultationPreview(response.data);
+    } catch (error) {
+      console.error("AI 미리보기 실패:", error);
+      alert(error.response?.data?.message || "AI 미리보기 실패");
+    } finally {
+      setIsPreviewLoading(false);
+    }
+  };
   const deleteConsultation = async (consultationId) => {
     const confirmDelete = confirm("정말 이 상담 기록을 삭제할까요?");
 
@@ -932,8 +964,10 @@ function App() {
             nurseMemo={nurseMemo}
             setNurseMemo={setNurseMemo}
             addConsultation={addConsultation}
+            previewAiConsultation={previewAiConsultation}
             fileInputRef={fileInputRef}
             isLoading={isLoading}
+            isPreviewLoading={isPreviewLoading}
             loadingMessage={loadingMessage}
           />
 
@@ -1019,6 +1053,12 @@ function App() {
         </div>
       </main>
 
+      {consultationPreview && (
+        <AiConsultationReviewModal
+          preview={consultationPreview}
+          onClose={() => setConsultationPreview(null)}
+        />
+      )}
     </div>
   );
 }

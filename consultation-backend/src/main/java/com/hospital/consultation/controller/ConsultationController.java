@@ -2,7 +2,11 @@ package com.hospital.consultation.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hospital.consultation.dto.AiAnalysisResultDto;
+import com.hospital.consultation.dto.AiConsultationPreviewDto;
+import com.hospital.consultation.dto.AiPatientExtractionDto;
+import com.hospital.consultation.dto.AppointmentDraftDto;
 import com.hospital.consultation.dto.ConsultationRequestDto;
+import com.hospital.consultation.dto.PatientCandidateDto;
 import com.hospital.consultation.entity.AiAnalysis;
 import com.hospital.consultation.entity.Consultation;
 import com.hospital.consultation.entity.Patient;
@@ -19,9 +23,14 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 import com.hospital.consultation.service.AudioConvertService;
 import com.hospital.consultation.service.AiService;
+import com.hospital.consultation.service.AppointmentService;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequiredArgsConstructor
@@ -36,6 +45,7 @@ public class ConsultationController {
     private final AppointmentRepository appointmentRepository;
     private final ObjectMapper objectMapper;
     private final AudioConvertService audioConvertService;
+    private final AppointmentService appointmentService;
 
     @PostMapping("/{patientId}")
     public Consultation createConsultation(
@@ -164,6 +174,61 @@ public class ConsultationController {
     @GetMapping("/analysis")
     public List<AiAnalysis> getAiAnalyses() {
         return aiAnalysisRepository.findAll();
+    }
+
+    @PostMapping("/preview")
+    public AiConsultationPreviewDto previewConsultation(
+            @RequestParam(value = "audioFile", required = false) MultipartFile audioFile,
+            @RequestParam(value = "file", required = false) MultipartFile file,
+            @RequestParam(value = "nurseMemo", required = false) String nurseMemo,
+            @RequestParam(value = "directText", required = false) String directText
+    ) throws Exception {
+        MultipartFile selectedFile = audioFile != null ? audioFile : file;
+        String originalText = trimToNull(directText);
+        String trimmedNurseMemo = trimToNull(nurseMemo);
+
+        if (selectedFile != null && !selectedFile.isEmpty()) {
+            String transcribedText = transcribeTemporaryAudio(selectedFile);
+            originalText = joinNonBlank("\n\n", originalText, transcribedText);
+        }
+
+        String analysisInput = buildAnalysisInput(originalText, trimmedNurseMemo);
+
+        if (analysisInput == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "?뚯꽦 ?뚯씪, ?곷떞 ?댁슜, 媛꾪샇??硫붾え 以??섎굹媛 ?꾩슂?⑸땲??");
+        }
+
+        String summary = aiService.summarize(analysisInput);
+        AiAnalysisResultDto analysisResult =
+                objectMapper.readValue(aiService.analyze(analysisInput), AiAnalysisResultDto.class);
+        AiPatientExtractionDto patientExtraction =
+                parsePatientExtraction(aiService.extractPatientProfile(analysisInput));
+        AppointmentDraftDto appointmentDraft =
+                appointmentService.createAppointmentDraftFromText(analysisInput);
+
+        AiConsultationPreviewDto preview = new AiConsultationPreviewDto();
+        preview.setOriginalText(originalText);
+        preview.setNurseMemo(trimmedNurseMemo);
+        preview.setSummary(summary);
+        preview.setSymptoms(splitToList(analysisResult.getSymptoms()));
+        preview.setRiskLevel(analysisResult.getRiskLevel());
+        preview.setKeywords(splitToList(analysisResult.getKeywords()));
+        preview.setExtractedPatientName(patientExtraction.getName());
+        preview.setExtractedPhone(patientExtraction.getPhone());
+        preview.setExtractedBirth(patientExtraction.getBirth());
+        preview.setPatientCandidates(findPatientCandidates(patientExtraction));
+        preview.setAppointmentDate(firstNonBlank(
+                appointmentDraft.getAppointmentDate(),
+                appointmentDraft.getAppointmentDateTime()
+        ));
+        preview.setVisitReason(firstNonBlank(
+                appointmentDraft.getMemo(),
+                appointmentDraft.getPurpose(),
+                appointmentDraft.getReason()
+        ));
+        preview.setStatus(appointmentDraft.getStatus());
+
+        return preview;
     }
 
     @PostMapping("/upload/{patientId}")
@@ -369,6 +434,165 @@ public class ConsultationController {
         }
 
         return builder.length() > 0 ? builder.toString() : null;
+    }
+
+    private String transcribeTemporaryAudio(MultipartFile file) throws Exception {
+        String uploadDir = System.getProperty("user.dir") + "/uploads/";
+        java.io.File directory = new java.io.File(uploadDir);
+
+        if (!directory.exists()) {
+            directory.mkdirs();
+        }
+
+        String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
+        String filePath = uploadDir + fileName;
+        String convertedPath = filePath;
+
+        file.transferTo(new java.io.File(filePath));
+
+        try {
+            if (fileName.toLowerCase().endsWith(".m4a")) {
+                convertedPath = audioConvertService.convertToMp3(filePath);
+            }
+
+            return trimToNull(localWhisperService.transcribe(new java.io.File(convertedPath)));
+        } finally {
+            deleteIfExists(filePath);
+            if (!convertedPath.equals(filePath)) {
+                deleteIfExists(convertedPath);
+            }
+        }
+    }
+
+    private void deleteIfExists(String path) {
+        java.io.File target = new java.io.File(path);
+        if (target.exists()) {
+            target.delete();
+        }
+    }
+
+    private AiPatientExtractionDto parsePatientExtraction(String patientJson) {
+        try {
+            AiPatientExtractionDto extraction =
+                    objectMapper.readValue(patientJson, AiPatientExtractionDto.class);
+            extraction.setName(trimToNull(extraction.getName()));
+            extraction.setPhone(trimToNull(extraction.getPhone()));
+            extraction.setBirth(trimToNull(extraction.getBirth()));
+            return extraction;
+        } catch (Exception ignored) {
+            return new AiPatientExtractionDto();
+        }
+    }
+
+    private List<PatientCandidateDto> findPatientCandidates(AiPatientExtractionDto extraction) {
+        Map<Long, PatientCandidateDto> candidates = new LinkedHashMap<>();
+
+        if (extraction == null) {
+            return List.of();
+        }
+
+        String phone = normalizePhone(extraction.getPhone());
+        String name = normalizeText(extraction.getName());
+        String birth = normalizeText(extraction.getBirth());
+        List<Patient> patients = patientRepository.findAll();
+
+        if (phone != null) {
+            for (Patient patient : patients) {
+                if (phone.equals(normalizePhone(patient.getPhone()))) {
+                    candidates.put(patient.getId(), toPatientCandidate(patient));
+                }
+            }
+        }
+
+        if (name != null && birth != null) {
+            for (Patient patient : patients) {
+                if (
+                        name.equals(normalizeText(patient.getName()))
+                                && birth.equals(normalizeText(patient.getBirth()))
+                ) {
+                    candidates.put(patient.getId(), toPatientCandidate(patient));
+                }
+            }
+        }
+
+        if (name != null) {
+            for (Patient patient : patients) {
+                if (name.equals(normalizeText(patient.getName()))) {
+                    candidates.put(patient.getId(), toPatientCandidate(patient));
+                }
+            }
+        }
+
+        return new ArrayList<>(candidates.values());
+    }
+
+    private PatientCandidateDto toPatientCandidate(Patient patient) {
+        PatientCandidateDto candidate = new PatientCandidateDto();
+        candidate.setId(patient.getId());
+        candidate.setName(patient.getName());
+        candidate.setPhone(patient.getPhone());
+        candidate.setBirth(patient.getBirth());
+        return candidate;
+    }
+
+    private List<String> splitToList(String value) {
+        if (value == null || value.isBlank()) {
+            return List.of();
+        }
+
+        return Arrays.stream(value.split("\\n|,"))
+                .map(item -> item.replaceAll("^[-*]\\s*", "").trim())
+                .filter(item -> !item.isBlank())
+                .toList();
+    }
+
+    private String joinNonBlank(String delimiter, String... values) {
+        StringBuilder builder = new StringBuilder();
+
+        for (String value : values) {
+            if (value == null || value.isBlank()) {
+                continue;
+            }
+
+            if (builder.length() > 0) {
+                builder.append(delimiter);
+            }
+
+            builder.append(value.trim());
+        }
+
+        return builder.length() > 0 ? builder.toString() : null;
+    }
+
+    private String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+
+        for (String value : values) {
+            if (value != null && !value.isBlank()) {
+                return value;
+            }
+        }
+
+        return null;
+    }
+
+    private String normalizePhone(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        String digits = value.replaceAll("\\D", "");
+        return digits.isBlank() ? null : digits;
+    }
+
+    private String normalizeText(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        return value.replaceAll("\\s+", "").trim();
     }
 
     private String createDoctorBriefing(

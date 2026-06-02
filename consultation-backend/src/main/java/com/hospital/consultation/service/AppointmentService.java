@@ -127,6 +127,14 @@ public class AppointmentService {
             return fallbackDraft();
         }
 
+        return createAppointmentDraftFromText(consultationText);
+    }
+
+    public AppointmentDraftDto createAppointmentDraftFromText(String consultationText) {
+        if (consultationText == null) {
+            return fallbackDraft();
+        }
+
         try {
             String response = aiService.extractAppointmentDraft(consultationText);
             AppointmentDraftDto draft = parseDraft(response);

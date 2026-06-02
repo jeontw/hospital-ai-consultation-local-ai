@@ -6,8 +6,10 @@ function ConsultationForm({
   nurseMemo,
   setNurseMemo,
   addConsultation,
+  previewAiConsultation,
   fileInputRef,
   isLoading,
+  isPreviewLoading,
   loadingMessage,
 }) {
   const selectedPatient = patients.find(
@@ -57,17 +59,31 @@ function ConsultationForm({
           />
         </div>
 
-        <button
-          onClick={addConsultation}
-          disabled={isLoading}
-          className={`h-10 rounded-md px-4 text-base font-semibold text-white transition ${
-            isLoading
-              ? "cursor-not-allowed bg-slate-400"
-              : "bg-slate-800 hover:bg-slate-700"
-          }`}
-        >
-          {isLoading ? "처리 중..." : "상담 등록"}
-        </button>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={previewAiConsultation}
+            disabled={isLoading || isPreviewLoading}
+            className={`h-10 rounded-md px-4 text-base font-semibold transition ${
+              isLoading || isPreviewLoading
+                ? "cursor-not-allowed bg-slate-200 text-slate-500"
+                : "border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+            }`}
+          >
+            {isPreviewLoading ? "미리보기 중..." : "AI 미리보기"}
+          </button>
+
+          <button
+            onClick={addConsultation}
+            disabled={isLoading || isPreviewLoading}
+            className={`h-10 rounded-md px-4 text-base font-semibold text-white transition ${
+              isLoading || isPreviewLoading
+                ? "cursor-not-allowed bg-slate-400"
+                : "bg-slate-800 hover:bg-slate-700"
+            }`}
+          >
+            {isLoading ? "처리 중..." : "상담 등록"}
+          </button>
+        </div>
 
         {isLoading && (
           <p className="text-base font-medium text-slate-600">

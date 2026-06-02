@@ -52,6 +52,34 @@ public class LocalAiService implements AiService {
     }
 
     @Override
+    public String extractPatientProfile(String consultationText) {
+        String prompt = """
+                You are a hospital patient information extraction assistant.
+                Respond with JSON only.
+                Do not include markdown, code fences, backticks, explanations, or any extra text.
+
+                Extract only patient identity fields explicitly mentioned in the consultation.
+
+                Output schema:
+                {
+                  "name": "patient name or null",
+                  "phone": "phone number or null",
+                  "birth": "yyyy-MM-dd birth date or null"
+                }
+
+                Rules:
+                - Use null when a field is not clearly present.
+                - Normalize phone numbers with hyphens when possible.
+                - Normalize birth to yyyy-MM-dd when possible.
+                - Do not guess missing values.
+
+                Consultation:
+                """ + consultationText;
+
+        return extractJsonObject(callOllama(prompt));
+    }
+
+    @Override
     public String extractAppointmentDraft(String consultationText) {
         String prompt = """
                 You are a hospital appointment draft extraction assistant.
