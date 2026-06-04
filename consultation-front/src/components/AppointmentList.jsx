@@ -1,3 +1,8 @@
+import {
+  getAppointmentDateTime,
+  getAppointmentStatusLabel,
+} from "../utils/appointmentStatus";
+
 function AppointmentList({
   selectedPatient,
   appointments,
@@ -7,16 +12,14 @@ function AppointmentList({
 }) {
   const now = new Date();
   const upcomingAppointments = appointments.filter((appointment) => {
-    const appointmentTime = new Date(
-      appointment.appointmentDate || appointment.appointmentDateTime || 0,
-    );
+    const appointmentTime = new Date(getAppointmentDateTime(appointment) || 0);
 
     return appointmentTime >= now;
   });
   const sortedAppointments = [...upcomingAppointments].sort(
     (a, b) =>
-      new Date(a.appointmentDate || a.appointmentDateTime || 0) -
-      new Date(b.appointmentDate || b.appointmentDateTime || 0),
+      new Date(getAppointmentDateTime(a) || 0) -
+      new Date(getAppointmentDateTime(b) || 0),
   );
   const getDoctorLabel = (doctor) => {
     if (!doctor?.name) {
@@ -56,17 +59,14 @@ function AppointmentList({
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="font-semibold text-slate-900">
-                    {new Date(
-                      appointment.appointmentDate ||
-                        appointment.appointmentDateTime,
-                    ).toLocaleString()}
+                    {new Date(getAppointmentDateTime(appointment)).toLocaleString()}
                   </p>
                   <p className="mt-1 text-slate-600">
                     {getDoctorLabel(appointment.doctor)}
                   </p>
                 </div>
                 <span className="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-700">
-                  {appointment.status || "예약됨"}
+                  {getAppointmentStatusLabel(appointment, now)}
                 </span>
               </div>
 
@@ -103,15 +103,14 @@ function AppointmentList({
               >
                 <p className="text-slate-900">
                   {new Date(
-                    appointment.appointmentDate ||
-                      appointment.appointmentDateTime,
+                    getAppointmentDateTime(appointment),
                   ).toLocaleString()}
                 </p>
                 <p className="font-semibold text-slate-700">
                   {getDoctorLabel(appointment.doctor)}
                 </p>
                 <p className="font-semibold text-slate-700">
-                  {appointment.status || "예약됨"}
+                  {getAppointmentStatusLabel(appointment, now)}
                 </p>
                 <p className="truncate text-slate-600">
                   {appointment.memo || "방문 사유 없음"}

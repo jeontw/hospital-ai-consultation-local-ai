@@ -1025,6 +1025,7 @@ function App() {
             appointments={allAppointments}
             selectedWeek={selectedWeek}
             selectedDoctorId={appointmentDraft.doctorId}
+            selectedPatientId={selectedPatient?.id || selectedViewPatientId}
             onChangeWeek={setSelectedWeek}
             onChangeDoctor={(doctorId) => {
               setAppointmentDraft((current) => ({

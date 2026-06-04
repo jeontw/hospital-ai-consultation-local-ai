@@ -1,4 +1,8 @@
 import { useEffect, useMemo } from "react";
+import {
+  getAppointmentStatusLabel,
+  isPastReservedAppointment,
+} from "../utils/appointmentStatus";
 
 const OPEN_TIME = 9;
 const CLOSE_TIME = 18;
@@ -69,16 +73,16 @@ function getAppointmentDoctorId(appointment) {
   return appointment.doctor?.id ?? appointment.doctorId ?? "";
 }
 
-function getStatusLabel(status) {
-  return status || "예약됨";
+function getStatusLabel(appointment) {
+  return getAppointmentStatusLabel(appointment);
 }
 
 function isCanceled(appointment) {
-  return getStatusLabel(appointment.status) === "취소";
+  return getStatusLabel(appointment) === "취소";
 }
 
 function isCompleted(appointment) {
-  return getStatusLabel(appointment.status) === "완료";
+  return getStatusLabel(appointment) === "완료";
 }
 
 function createTimeSlots() {
@@ -105,6 +109,7 @@ function DoctorWeeklyCalendar({
   appointments = [],
   selectedWeek,
   selectedDoctorId,
+  selectedPatientId,
   onChangeWeek,
   onChangeDoctor,
   onSelectSlot,
@@ -113,6 +118,7 @@ function DoctorWeeklyCalendar({
   doctorManagement,
 }) {
   const activeDoctorId = selectedDoctorId || "";
+  const activePatientId = selectedPatientId || "";
   const selectedDoctor = doctors.find(
     (doctor) => String(doctor.id) === String(activeDoctorId),
   );
@@ -291,18 +297,12 @@ function DoctorWeeklyCalendar({
                         `${day.date}|${slot.time}`,
                       );
 
-                      if (slot.isLunch) {
-                        return (
-                          <td
-                            key={day.date}
-                            className="bg-slate-100 px-2.5 py-2 text-sm text-slate-500"
-                          >
-                            점심시간
-                          </td>
-                        );
-                      }
-
                       if (appointment) {
+                        const isPastReserved = isPastReservedAppointment(appointment);
+                        const isSelectedPatientAppointment =
+                          activePatientId &&
+                          String(appointment.patient?.id) === String(activePatientId);
+
                         return (
                           <td
                             key={day.date}
@@ -313,15 +313,28 @@ function DoctorWeeklyCalendar({
                                     appointment.patient?.id,
                                   )
                             }
-                            className={`px-2.5 py-2 align-top text-sm ${
-                              isCompleted(appointment)
+                            className={`border border-white px-2.5 py-2 align-top text-sm shadow-[inset_0_0_0_1px_rgba(100,116,139,0.18)] ${
+                              isSelectedPatientAppointment
+                                ? "bg-amber-100 ring-2 ring-inset ring-amber-300"
+                                : isCompleted(appointment)
                                 ? "bg-emerald-50"
-                                : "bg-blue-50"
+                                : isPastReserved
+                                  ? "bg-slate-100"
+                                  : slot.isLunch
+                                    ? "bg-orange-50"
+                                  : "bg-blue-50"
                             } cursor-pointer hover:ring-2 hover:ring-inset hover:ring-blue-300`}
                           >
-                            <p className="font-bold leading-tight text-slate-900">
-                              {appointment.patient?.name || "환자명 없음"}
-                            </p>
+                            <div className="flex flex-wrap items-center gap-1">
+                              <p className="font-bold leading-tight text-slate-900">
+                                {appointment.patient?.name || "환자명 없음"}
+                              </p>
+                              {slot.isLunch && (
+                                <span className="rounded bg-orange-100 px-1.5 py-0.5 text-[11px] font-semibold text-orange-700">
+                                  점심시간
+                                </span>
+                              )}
+                            </div>
                             <p className="mt-0.5 line-clamp-1 text-sm text-slate-600">
                               {appointment.memo ||
                                 appointment.purpose ||
@@ -329,13 +342,30 @@ function DoctorWeeklyCalendar({
                             </p>
                             <span
                               className={`mt-1 inline-flex rounded px-1.5 py-0.5 text-xs font-semibold ${
-                                isCompleted(appointment)
+                                isSelectedPatientAppointment
+                                  ? "bg-amber-200 text-amber-900"
+                                  : isCompleted(appointment)
                                   ? "bg-emerald-100 text-emerald-700"
-                                  : "bg-blue-100 text-blue-700"
+                                  : isPastReserved
+                                    ? "bg-slate-200 text-slate-700"
+                                    : slot.isLunch
+                                      ? "bg-orange-100 text-orange-700"
+                                    : "bg-blue-100 text-blue-700"
                               }`}
                             >
-                              {getStatusLabel(appointment.status)}
+                              {getStatusLabel(appointment)}
                             </span>
+                          </td>
+                        );
+                      }
+
+                      if (slot.isLunch) {
+                        return (
+                          <td
+                            key={day.date}
+                            className="border-x border-orange-100 bg-orange-50 px-2.5 py-2 text-sm font-semibold text-orange-700"
+                          >
+                            점심시간
                           </td>
                         );
                       }
