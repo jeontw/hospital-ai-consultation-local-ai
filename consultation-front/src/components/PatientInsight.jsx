@@ -1,5 +1,7 @@
+import { useState } from "react";
 import ConsultationList from "./ConsultationList";
 import AppointmentList from "./AppointmentList";
+import { getPatientAiInsight } from "../api/consultationApi";
 import {
   getAppointmentDateTime,
   getAppointmentStatusLabel,
@@ -89,20 +91,6 @@ function getRiskFactors(consultations) {
   return [...found.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 }
 
-function getPatientNarrativeInsight(patient, consultationCount) {
-  if (consultationCount < 1) {
-    return null;
-  }
-
-  const patientName = patient?.name || "홍길동";
-
-  return [
-    `${patientName} 환자는 2026년 6월 초부터 소화불량, 속 더부룩함, 명치 답답함, 트림 증가, 속쓰림, 신물 올라옴 등의 위장 관련 증상으로 반복 상담 및 진료를 진행하였다. 초기에는 식후 더부룩함과 트림이 주된 증상이었으며, 이후 신물 올라옴과 속쓰림이 추가되어 역류성 증상 가능성이 함께 관찰되었다.`,
-    "위내시경 검사 예약 및 시행 이력이 있으며, 검사 당시 위염 소견이 언급되었다. 약물 복용 후 증상은 대체로 호전되었으나, 약 감량 또는 중단 시도 후 회식, 음주, 야식, 커피 섭취, 식후 바로 눕기, 스트레스, 야근, 불규칙한 식사 등의 생활습관 요인과 함께 증상이 반복적으로 재발하는 양상을 보였다.",
-    "현재까지 상담 기록상 심한 복통, 구토, 혈변, 급격한 체중 감소, 고열 등 급성 위험 신호는 반복적으로 부인하였다. 다만 증상이 장기간 반복되고 생활습관 변화에 민감하게 반응하는 패턴이 있어, 향후 상담 시 복약 유지 여부, 식습관, 커피 섭취, 야식, 스트레스 관리, 수면 패턴을 함께 확인하는 것이 좋다.",
-  ];
-}
-
 function PatientInsight({
   selectedPatient,
   consultations,
@@ -118,6 +106,11 @@ function PatientInsight({
   onUpdateAppointmentStatus,
   onDeleteAppointment,
 }) {
+  const [personalizedRecord, setPersonalizedRecord] = useState(null);
+  const [isPersonalizedRecordLoading, setIsPersonalizedRecordLoading] =
+    useState(false);
+  const [personalizedRecordError, setPersonalizedRecordError] = useState("");
+
   if (!selectedPatient) {
     return (
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -199,7 +192,34 @@ function PatientInsight({
     null;
   const latestRiskLevel = recentConsultation?.aiAnalysis?.riskLevel || "분석 없음";
   const hasRiskHistory = highRiskCount > 0 || mediumRiskCount > 0;
-  const narrativeInsight = getPatientNarrativeInsight(selectedPatient, totalCount);
+  const currentPersonalizedRecord =
+    personalizedRecord?.patientId === selectedPatient.id
+      ? personalizedRecord.content
+      : "";
+
+  const analyzePersonalizedRecord = async () => {
+    if (!selectedPatient?.id || totalCount < 1) {
+      return;
+    }
+
+    setIsPersonalizedRecordLoading(true);
+    setPersonalizedRecordError("");
+
+    try {
+      const response = await getPatientAiInsight(selectedPatient.id);
+      setPersonalizedRecord({
+        patientId: selectedPatient.id,
+        content: String(response.data || "분석 결과가 없습니다."),
+      });
+    } catch (error) {
+      console.error("개인화 기록 분석 실패:", error);
+      setPersonalizedRecordError(
+        error.response?.data?.message || "개인화 기록 분석에 실패했습니다.",
+      );
+    } finally {
+      setIsPersonalizedRecordLoading(false);
+    }
+  };
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
@@ -288,23 +308,47 @@ function PatientInsight({
         </p>
       </div>
 
-      {narrativeInsight && (
-        <div className="mb-2 rounded-md border border-blue-200 bg-blue-50 p-3">
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <p className="text-base font-bold text-slate-900">
-              개인화 기록 창고
+      <div className="mb-2 rounded-md border border-blue-200 bg-blue-50 p-3">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-base font-bold text-slate-900">개인화 기록 창고</p>
+            <p className="mt-0.5 text-xs text-slate-600">
+              버튼을 누를 때만 누적 상담을 AI가 분석합니다.
             </p>
-            <span className="rounded bg-white px-2 py-0.5 text-xs font-semibold text-blue-700">
-              상담 {totalCount}건 누적
-            </span>
           </div>
-          <div className="space-y-2 text-sm leading-6 text-slate-700">
-            {narrativeInsight.map((paragraph) => (
-              <p key={paragraph}>{paragraph}</p>
-            ))}
+          <div className="flex items-center gap-2">
+            <span className="rounded bg-white px-2 py-0.5 text-xs font-semibold text-blue-700">
+              상담 {totalCount}건
+            </span>
+            <button
+              type="button"
+              onClick={analyzePersonalizedRecord}
+              disabled={totalCount < 1 || isPersonalizedRecordLoading}
+              className="rounded-md bg-blue-700 px-3 py-1.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+            >
+              {isPersonalizedRecordLoading
+                ? "기록 분석 중..."
+                : currentPersonalizedRecord
+                  ? "개인화 기록 업데이트"
+                  : "개인화 기록 확인"}
+            </button>
           </div>
         </div>
-      )}
+
+        {personalizedRecordError ? (
+          <p className="rounded bg-red-50 p-2 text-sm text-red-700">
+            {personalizedRecordError}
+          </p>
+        ) : currentPersonalizedRecord ? (
+          <div className="whitespace-pre-wrap rounded bg-white p-3 text-sm leading-6 text-slate-700">
+            {currentPersonalizedRecord}
+          </div>
+        ) : (
+          <p className="rounded bg-white p-3 text-sm text-slate-500">
+            아직 분석하지 않았습니다. 필요할 때 개인화 기록 확인을 눌러주세요.
+          </p>
+        )}
+      </div>
 
       <div className="mb-2 grid grid-cols-2 gap-2">
         <div className="rounded-md border border-slate-200 p-2.5">

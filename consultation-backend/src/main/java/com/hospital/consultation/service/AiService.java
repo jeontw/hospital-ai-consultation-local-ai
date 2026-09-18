@@ -6,6 +6,8 @@ public interface AiService {
 
     String analyze(String text);
 
+    String analyzeConsultationBundle(String consultationText);
+
     String extractPatientProfile(String consultationText);
 
     String extractAppointmentDraft(String consultationText);

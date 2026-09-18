@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hospital.consultation.dto.AiAnalysisResultDto;
 import com.hospital.consultation.dto.AiConsultationConfirmRequestDto;
 import com.hospital.consultation.dto.AiConsultationConfirmResponseDto;
+import com.hospital.consultation.dto.AiConsultationBundleDto;
 import com.hospital.consultation.dto.AiConsultationPreviewDto;
 import com.hospital.consultation.dto.AiPatientExtractionDto;
 import com.hospital.consultation.dto.AppointmentDraftDto;
@@ -30,6 +31,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.hospital.consultation.service.AudioConvertService;
 import com.hospital.consultation.service.AiService;
 import com.hospital.consultation.service.AppointmentService;
+import com.hospital.consultation.service.AiModelSettingsService;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -53,6 +55,7 @@ public class ConsultationController {
     private final ObjectMapper objectMapper;
     private final AudioConvertService audioConvertService;
     private final AppointmentService appointmentService;
+    private final AiModelSettingsService aiModelSettingsService;
 
     @PostMapping("/{patientId}")
     public Consultation createConsultation(
@@ -96,13 +99,6 @@ public class ConsultationController {
 
         aiAnalysisRepository.save(aiAnalysis);
 
-        savedConsultation.setDoctorBriefing(createDoctorBriefing(
-                originalText,
-                nurseMemo,
-                summary,
-                result
-        ));
-
         return consultationRepository.save(savedConsultation);
     }
 
@@ -132,20 +128,20 @@ public class ConsultationController {
 
         StringBuilder prompt = new StringBuilder();
 
-        prompt.append("다음은 한 환자의 과거 전화 상담 기록입니다.\n");
+        prompt.append("다음은 한 환자의 과거 전화 상담 기록을 요약한 데이터입니다.\n");
         prompt.append("의료진이 참고할 수 있도록 환자별 종합 인사이트를 작성해주세요.\n");
         prompt.append("진단을 내리지 말고, 상담 기록 기반의 주의점과 반복되는 증상 중심으로 정리해주세요.\n\n");
 
         prompt.append("환자명: ").append(patient.getName()).append("\n");
-        prompt.append("전화번호: ").append(patient.getPhone()).append("\n\n");
+        prompt.append("상담 건수: ").append(consultations.size()).append("\n\n");
 
         for (Consultation consultation : consultations) {
             prompt.append("- 상담일: ").append(consultation.getCreatedAt()).append("\n");
-            prompt.append("상담 내용: ").append(consultation.getOriginalText()).append("\n");
-            if (consultation.getNurseMemo() != null && !consultation.getNurseMemo().isBlank()) {
-                prompt.append("간호사 메모: ").append(consultation.getNurseMemo()).append("\n");
+            if (consultation.getSummary() != null && !consultation.getSummary().isBlank()) {
+                prompt.append("요약: ").append(consultation.getSummary()).append("\n");
+            } else if (consultation.getOriginalText() != null && !consultation.getOriginalText().isBlank()) {
+                prompt.append("상담 내용: ").append(consultation.getOriginalText()).append("\n");
             }
-            prompt.append("AI 요약: ").append(consultation.getSummary()).append("\n");
 
             if (consultation.getAiAnalysis() != null) {
                 prompt.append("증상: ").append(consultation.getAiAnalysis().getSymptoms()).append("\n");
@@ -168,14 +164,27 @@ public class ConsultationController {
 [주의 사항]
 - 의료진이 주의할 점 정리
 
-[추천 질문]
-- 다음 상담 시 확인하면 좋은 질문들을 bullet 형식으로 작성
-
 문장은 짧고 가독성 있게 작성해주세요.
 진단하지 말고 상담 보조 형태로 작성해주세요.
 """);
 
         return aiService.summarize(prompt.toString());
+    }
+
+    @Transactional
+    @PostMapping("/{consultationId}/doctor-briefing")
+    public Consultation generateDoctorBriefing(@PathVariable Long consultationId) {
+        Consultation consultation = consultationRepository.findById(consultationId)
+                .orElseThrow(() -> new RuntimeException("상담 기록을 찾을 수 없습니다."));
+
+        consultation.setDoctorBriefing(createDoctorBriefing(
+                consultation.getOriginalText(),
+                consultation.getNurseMemo(),
+                consultation.getSummary(),
+                consultation.getAiAnalysis()
+        ));
+
+        return consultationRepository.save(consultation);
     }
 
     @GetMapping("/analysis")
@@ -190,16 +199,19 @@ public class ConsultationController {
             @RequestParam(value = "nurseMemo", required = false) String nurseMemo,
             @RequestParam(value = "directText", required = false) String directText
     ) throws Exception {
+        long totalStartedAt = System.nanoTime();
         MultipartFile selectedFile = audioFile != null ? audioFile : file;
         String originalText = trimToNull(directText);
         String trimmedNurseMemo = trimToNull(nurseMemo);
         String audioPath = null;
+        long whisperProcessingMs = 0L;
 
         if (selectedFile != null && !selectedFile.isEmpty()) {
             PreviewAudioResult previewAudio = storePreviewAudio(selectedFile);
             String transcribedText = previewAudio.originalText();
             originalText = joinNonBlank("\n\n", originalText, transcribedText);
             audioPath = previewAudio.audioPath();
+            whisperProcessingMs = previewAudio.whisperProcessingMs();
         }
 
         String analysisInput = buildAnalysisInput(originalText, trimmedNurseMemo);
@@ -208,13 +220,23 @@ public class ConsultationController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "?뚯꽦 ?뚯씪, ?곷떞 ?댁슜, 媛꾪샇??硫붾え 以??섎굹媛 ?꾩슂?⑸땲??");
         }
 
-        String summary = aiService.summarize(analysisInput);
-        AiAnalysisResultDto analysisResult =
-                objectMapper.readValue(aiService.analyze(analysisInput), AiAnalysisResultDto.class);
-        AiPatientExtractionDto patientExtraction =
-                parsePatientExtraction(aiService.extractPatientProfile(analysisInput));
-        AppointmentDraftDto appointmentDraft =
-                appointmentService.createAppointmentDraftFromText(analysisInput);
+        long llmStartedAt = System.nanoTime();
+        AiConsultationBundleDto aiResult = objectMapper.readValue(
+                aiService.analyzeConsultationBundle(analysisInput),
+                AiConsultationBundleDto.class
+        );
+        String summary = firstNonBlank(aiResult.getSummary(), "요약을 생성하지 못했습니다.");
+        AiAnalysisResultDto analysisResult = aiResult.getAnalysis() == null
+                ? new AiAnalysisResultDto()
+                : aiResult.getAnalysis();
+        AiPatientExtractionDto patientExtraction = aiResult.getPatient() == null
+                ? new AiPatientExtractionDto()
+                : aiResult.getPatient();
+        AppointmentDraftDto appointmentDraft = appointmentService.normalizeAppointmentDraft(
+                aiResult.getAppointment(),
+                analysisInput
+        );
+        long llmProcessingMs = elapsedMillis(llmStartedAt);
         List<PatientCandidateDto> patientCandidates = findPatientCandidates(patientExtraction);
         PatientRecommendation patientRecommendation =
                 recommendPatient(patientExtraction, patientCandidates);
@@ -254,6 +276,10 @@ public class ConsultationController {
         preview.setRecommendedDoctorId(doctorRecommendation.doctorId());
         preview.setRecommendedDoctorName(doctorRecommendation.doctorName());
         preview.setDoctorRecommendationReason(doctorRecommendation.reason());
+        preview.setAiModel(aiModelSettingsService.getCurrentModel());
+        preview.setWhisperProcessingMs(whisperProcessingMs);
+        preview.setLlmProcessingMs(llmProcessingMs);
+        preview.setTotalProcessingMs(elapsedMillis(totalStartedAt));
 
         return preview;
     }
@@ -288,14 +314,6 @@ public class ConsultationController {
         consultation.setSummary(summary);
         consultation.setAudioPath(trimToNull(requestDto.getAudioPath()));
         consultation.setCreatedAt(LocalDateTime.now());
-        consultation.setDoctorBriefing(createPreviewDoctorBriefing(
-                requestDto.getVisitReason(),
-                summary,
-                symptoms,
-                riskLevel,
-                keywords
-        ));
-
         Consultation savedConsultation = consultationRepository.save(consultation);
 
         AiAnalysis aiAnalysis = new AiAnalysis();
@@ -418,13 +436,6 @@ public class ConsultationController {
 
         aiAnalysisRepository.save(aiAnalysis);
 
-        savedConsultation.setDoctorBriefing(createDoctorBriefing(
-                originalText,
-                trimmedNurseMemo,
-                summary,
-                result
-        ));
-
         return consultationRepository.save(savedConsultation);
     }
 
@@ -474,12 +485,7 @@ public class ConsultationController {
 
         aiAnalysisRepository.save(aiAnalysis);
 
-        savedConsultation.setDoctorBriefing(createDoctorBriefing(
-                originalText,
-                nurseMemo,
-                summary,
-                result
-        ));
+        savedConsultation.setDoctorBriefing(null);
 
         return consultationRepository.save(savedConsultation);
     }
@@ -560,9 +566,11 @@ public class ConsultationController {
             fileName = new java.io.File(convertedPath).getName();
         }
 
+        long whisperStartedAt = System.nanoTime();
         String originalText = trimToNull(localWhisperService.transcribe(new java.io.File(convertedPath)));
+        long whisperProcessingMs = elapsedMillis(whisperStartedAt);
         String audioPath = "/uploads/" + fileName;
-        return new PreviewAudioResult(originalText, audioPath);
+        return new PreviewAudioResult(originalText, audioPath, whisperProcessingMs);
     }
 
     private void deleteIfExists(String path) {
@@ -572,21 +580,15 @@ public class ConsultationController {
         }
     }
 
-    private record PreviewAudioResult(String originalText, String audioPath) {
+    private long elapsedMillis(long startedAt) {
+        return (System.nanoTime() - startedAt) / 1_000_000L;
     }
 
-    private AiPatientExtractionDto parsePatientExtraction(String patientJson) {
-        try {
-            AiPatientExtractionDto extraction =
-                    objectMapper.readValue(patientJson, AiPatientExtractionDto.class);
-            extraction.setName(trimToNull(extraction.getName()));
-            extraction.setPhone(trimToNull(extraction.getPhone()));
-            extraction.setPhoneLast4(trimToNull(extraction.getPhoneLast4()));
-            extraction.setBirth(trimToNull(extraction.getBirth()));
-            return extraction;
-        } catch (Exception ignored) {
-            return new AiPatientExtractionDto();
-        }
+    private record PreviewAudioResult(
+            String originalText,
+            String audioPath,
+            long whisperProcessingMs
+    ) {
     }
 
     private List<PatientCandidateDto> findPatientCandidates(AiPatientExtractionDto extraction) {
@@ -977,24 +979,6 @@ public class ConsultationController {
         );
     }
 
-    private String createPreviewDoctorBriefing(
-            String visitReason,
-            String summary,
-            String symptoms,
-            String riskLevel,
-            String keywords
-    ) throws Exception {
-        Map<String, Object> briefing = new LinkedHashMap<>();
-        briefing.put("visitReason", trimToNull(visitReason));
-        briefing.put("mainSymptoms", splitToList(symptoms));
-        briefing.put("specialNotes", splitToList(summary));
-        briefing.put("attentionLevel", trimToNull(riskLevel));
-        briefing.put("recommendedQuestions", List.of());
-        briefing.put("keywords", splitToList(keywords));
-
-        return objectMapper.writeValueAsString(briefing);
-    }
-
     private record DoctorRecommendation(
             Long doctorId,
             String doctorName,
@@ -1019,7 +1003,7 @@ public class ConsultationController {
             String originalText,
             String nurseMemo,
             String summary,
-            AiAnalysisResultDto analysisResult
+            AiAnalysis analysisResult
     ) {
         StringBuilder input = new StringBuilder();
 

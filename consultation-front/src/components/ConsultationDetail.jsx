@@ -17,7 +17,6 @@ function parseDoctorBriefing(value) {
       mainSymptoms: [],
       specialNotes: [String(value)],
       attentionLevel: "",
-      recommendedQuestions: [],
     };
   }
 }
@@ -40,11 +39,14 @@ function normalizeList(value) {
 function ConsultationDetail({
   selectedConsultation,
   getRiskColor,
+  onGenerateDoctorBriefing,
   emptyMessage = "상담을 선택하면 상세 정보가 표시됩니다.",
 }) {
   const [isDoctorSendOpen, setIsDoctorSendOpen] = useState(false);
   const [doctorSendText, setDoctorSendText] = useState("");
   const [isDoctorSendDone, setIsDoctorSendDone] = useState(false);
+  const [isDoctorBriefingLoading, setIsDoctorBriefingLoading] = useState(false);
+  const [doctorBriefingError, setDoctorBriefingError] = useState("");
 
   if (!selectedConsultation) {
     return (
@@ -75,9 +77,6 @@ function ConsultationDetail({
   const doctorBriefing = parseDoctorBriefing(selectedConsultation.doctorBriefing);
   const mainSymptoms = normalizeList(doctorBriefing?.mainSymptoms);
   const specialNotes = normalizeList(doctorBriefing?.specialNotes);
-  const recommendedQuestions = normalizeList(
-    doctorBriefing?.recommendedQuestions,
-  );
   const attentionLevel =
     doctorBriefing?.attentionLevel ||
     selectedConsultation.aiAnalysis?.riskLevel ||
@@ -124,6 +123,22 @@ function ConsultationDetail({
     console.log("상담 상세 의사용 브리핑 전송:", doctorSendText);
     setIsDoctorSendDone(true);
     alert("의사에게 브리핑 내용을 전송했습니다.");
+  };
+
+  const generateDoctorBriefing = async () => {
+    setIsDoctorBriefingLoading(true);
+    setDoctorBriefingError("");
+
+    try {
+      await onGenerateDoctorBriefing?.(selectedConsultation.id);
+    } catch (error) {
+      console.error("의사용 브리핑 작성 실패:", error);
+      setDoctorBriefingError(
+        error.response?.data?.message || "의사용 브리핑 작성에 실패했습니다.",
+      );
+    } finally {
+      setIsDoctorBriefingLoading(false);
+    }
   };
 
   return (
@@ -181,11 +196,25 @@ function ConsultationDetail({
             <div className="flex items-center gap-2">
               <button
                 type="button"
+                onClick={generateDoctorBriefing}
+                disabled={isDoctorBriefingLoading}
+                className="h-8 rounded-md bg-blue-700 px-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+              >
+                {isDoctorBriefingLoading
+                  ? "브리핑 작성 중..."
+                  : doctorBriefing
+                    ? "브리핑 다시 작성"
+                    : "의사용 브리핑 작성"}
+              </button>
+              {doctorBriefing && (
+              <button
+                type="button"
                 onClick={openDoctorSend}
                 className="h-8 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
               >
                 의사에게 전송
               </button>
+              )}
               <span
                 className={`inline-block rounded-full border px-3 py-1 text-sm font-bold ${getRiskColor(
                   attentionLevel,
@@ -195,6 +224,12 @@ function ConsultationDetail({
               </span>
             </div>
           </div>
+
+          {doctorBriefingError && (
+            <p className="mb-3 rounded bg-red-50 p-2 text-sm text-red-700">
+              {doctorBriefingError}
+            </p>
+          )}
 
           {doctorBriefing ? (
             <div className="grid grid-cols-2 gap-3 text-base">
@@ -227,24 +262,10 @@ function ConsultationDetail({
                 </ul>
               </div>
 
-              <div className="rounded-md bg-slate-50 p-3">
-                <p className="mb-1 font-semibold text-slate-500">
-                  추천 확인 질문
-                </p>
-                <ul className="list-disc space-y-1 pl-5 text-slate-800">
-                  {(
-                    recommendedQuestions.length
-                      ? recommendedQuestions
-                      : ["증상은 언제부터 시작되었나요?"]
-                  ).map((question) => (
-                    <li key={question}>{question}</li>
-                  ))}
-                </ul>
-              </div>
             </div>
           ) : (
             <p className="rounded-md bg-slate-50 p-3 text-base text-slate-500">
-              브리핑 없음
+              아직 작성하지 않았습니다. 필요할 때 의사용 브리핑 작성을 눌러주세요.
             </p>
           )}
 

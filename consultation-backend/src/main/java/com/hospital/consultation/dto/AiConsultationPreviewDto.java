@@ -50,4 +50,12 @@ public class AiConsultationPreviewDto {
     private String recommendedDoctorName;
 
     private String doctorRecommendationReason;
+
+    private String aiModel;
+
+    private Long whisperProcessingMs;
+
+    private Long llmProcessingMs;
+
+    private Long totalProcessingMs;
 }

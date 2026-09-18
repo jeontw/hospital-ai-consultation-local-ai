@@ -91,6 +91,25 @@ function AiConsultationReviewModal({
           </button>
         </div>
 
+        <div className="mb-4 grid grid-cols-2 gap-2 rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-slate-700 sm:grid-cols-4">
+          <div>
+            <p className="font-semibold text-slate-900">Whisper</p>
+            <p>{((preview.whisperProcessingMs || 0) / 1000).toFixed(2)}초</p>
+          </div>
+          <div>
+            <p className="font-semibold text-slate-900">로컬 LLM</p>
+            <p>{((preview.llmProcessingMs || 0) / 1000).toFixed(2)}초</p>
+          </div>
+          <div>
+            <p className="font-semibold text-slate-900">전체 처리</p>
+            <p>{((preview.totalProcessingMs || 0) / 1000).toFixed(2)}초</p>
+          </div>
+          <div>
+            <p className="font-semibold text-slate-900">사용 모델</p>
+            <p>{preview.aiModel || "확인 불가"}</p>
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-3">
             <div className="rounded-md border border-slate-200 p-3">

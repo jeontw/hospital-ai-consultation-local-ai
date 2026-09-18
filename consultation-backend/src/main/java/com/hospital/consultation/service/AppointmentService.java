@@ -144,6 +144,13 @@ public class AppointmentService {
         }
     }
 
+    public AppointmentDraftDto normalizeAppointmentDraft(
+            AppointmentDraftDto draft,
+            String consultationText
+    ) {
+        return normalizeDraft(draft, consultationText);
+    }
+
     private AppointmentDraftDto parseDraft(String response) {
         String cleaned = cleanJsonResponse(response);
         if (cleaned.isBlank()) {

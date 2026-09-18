@@ -28,3 +28,9 @@ export const updateConsultationById = (consultationId, data) => {
 export const getPatientAiInsight = (patientId) => {
   return axios.get(`${BASE_URL}/consultations/patient/${patientId}/insight`);
 };
+
+export const generateDoctorBriefing = (consultationId) => {
+  return axios.post(
+    `${BASE_URL}/consultations/${consultationId}/doctor-briefing`,
+  );
+};
