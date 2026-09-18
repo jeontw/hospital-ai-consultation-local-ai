@@ -14,6 +14,7 @@ import {
   deleteConsultationById,
   updateConsultationById,
   generateDoctorBriefing,
+  updateDoctorBriefing,
 } from "./api/consultationApi";
 import {
   createAppointment,
@@ -670,6 +671,21 @@ function App() {
 
     return updatedConsultation;
   };
+  const saveDoctorBriefing = async (consultationId, briefing) => {
+    const response = await updateDoctorBriefing(consultationId, briefing);
+    const updatedConsultation = response.data;
+
+    setConsultations((current) =>
+      current.map((consultation) =>
+        consultation.id === updatedConsultation.id
+          ? updatedConsultation
+          : consultation,
+      ),
+    );
+    setSelectedConsultation(updatedConsultation);
+
+    return updatedConsultation;
+  };
   const generateAppointmentDraft = useCallback(
     async (consultation = selectedConsultation, { silent = false } = {}) => {
       if (!consultation) {
@@ -1027,6 +1043,7 @@ function App() {
               selectedConsultation={selectedConsultation}
               getRiskColor={getRiskColor}
               onGenerateDoctorBriefing={createDoctorBriefing}
+              onUpdateDoctorBriefing={saveDoctorBriefing}
               emptyMessage={
                 selectedPatient
                   ? "왼쪽 환자 인사이트의 전체 상담 목록에서 상세 보기를 선택하세요."

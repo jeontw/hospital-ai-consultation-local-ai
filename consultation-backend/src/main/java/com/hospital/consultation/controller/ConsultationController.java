@@ -10,6 +10,7 @@ import com.hospital.consultation.dto.AiPatientExtractionDto;
 import com.hospital.consultation.dto.AppointmentDraftDto;
 import com.hospital.consultation.dto.AppointmentRequestDto;
 import com.hospital.consultation.dto.ConsultationRequestDto;
+import com.hospital.consultation.dto.DoctorBriefingUpdateDto;
 import com.hospital.consultation.dto.PatientCandidateDto;
 import com.hospital.consultation.entity.AiAnalysis;
 import com.hospital.consultation.entity.Appointment;
@@ -184,6 +185,33 @@ public class ConsultationController {
                 consultation.getAiAnalysis()
         ));
 
+        return consultationRepository.save(consultation);
+    }
+
+    @Transactional
+    @PutMapping("/{consultationId}/doctor-briefing")
+    public Consultation updateDoctorBriefing(
+            @PathVariable Long consultationId,
+            @RequestBody DoctorBriefingUpdateDto requestDto
+    ) throws Exception {
+        Consultation consultation = consultationRepository.findById(consultationId)
+                .orElseThrow(() -> new RuntimeException("상담 기록을 찾을 수 없습니다."));
+
+        String attentionLevel = trimToNull(requestDto.getAttentionLevel());
+        if (attentionLevel != null && !List.of("낮음", "보통", "높음").contains(attentionLevel)) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "주의도는 낮음, 보통, 높음 중 하나여야 합니다."
+            );
+        }
+
+        Map<String, Object> briefing = new LinkedHashMap<>();
+        briefing.put("visitReason", trimToNull(requestDto.getVisitReason()));
+        briefing.put("mainSymptoms", splitToList(requestDto.getMainSymptoms()));
+        briefing.put("specialNotes", splitToList(requestDto.getSpecialNotes()));
+        briefing.put("attentionLevel", attentionLevel);
+
+        consultation.setDoctorBriefing(objectMapper.writeValueAsString(briefing));
         return consultationRepository.save(consultation);
     }
 

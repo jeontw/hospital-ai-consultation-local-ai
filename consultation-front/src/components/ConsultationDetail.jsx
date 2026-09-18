@@ -40,6 +40,7 @@ function ConsultationDetail({
   selectedConsultation,
   getRiskColor,
   onGenerateDoctorBriefing,
+  onUpdateDoctorBriefing,
   emptyMessage = "상담을 선택하면 상세 정보가 표시됩니다.",
 }) {
   const [isDoctorSendOpen, setIsDoctorSendOpen] = useState(false);
@@ -47,6 +48,14 @@ function ConsultationDetail({
   const [isDoctorSendDone, setIsDoctorSendDone] = useState(false);
   const [isDoctorBriefingLoading, setIsDoctorBriefingLoading] = useState(false);
   const [doctorBriefingError, setDoctorBriefingError] = useState("");
+  const [isDoctorBriefingEditing, setIsDoctorBriefingEditing] = useState(false);
+  const [isDoctorBriefingSaving, setIsDoctorBriefingSaving] = useState(false);
+  const [doctorBriefingForm, setDoctorBriefingForm] = useState({
+    visitReason: "",
+    mainSymptoms: "",
+    specialNotes: "",
+    attentionLevel: "",
+  });
 
   if (!selectedConsultation) {
     return (
@@ -141,6 +150,44 @@ function ConsultationDetail({
     }
   };
 
+  const openDoctorBriefingEdit = () => {
+    setDoctorBriefingForm({
+      visitReason: doctorBriefing?.visitReason || "",
+      mainSymptoms: mainSymptoms.join(", "),
+      specialNotes: specialNotes.join("\n"),
+      attentionLevel: doctorBriefing?.attentionLevel || "",
+    });
+    setDoctorBriefingError("");
+    setIsDoctorBriefingEditing(true);
+  };
+
+  const changeDoctorBriefingField = (field) => (event) => {
+    setDoctorBriefingForm((current) => ({
+      ...current,
+      [field]: event.target.value,
+    }));
+  };
+
+  const saveDoctorBriefing = async () => {
+    setIsDoctorBriefingSaving(true);
+    setDoctorBriefingError("");
+
+    try {
+      await onUpdateDoctorBriefing?.(
+        selectedConsultation.id,
+        doctorBriefingForm,
+      );
+      setIsDoctorBriefingEditing(false);
+    } catch (error) {
+      console.error("의사용 브리핑 수정 실패:", error);
+      setDoctorBriefingError(
+        error.response?.data?.message || "의사용 브리핑 수정에 실패했습니다.",
+      );
+    } finally {
+      setIsDoctorBriefingSaving(false);
+    }
+  };
+
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between gap-3">
@@ -207,13 +254,23 @@ function ConsultationDetail({
                     : "의사용 브리핑 작성"}
               </button>
               {doctorBriefing && (
-              <button
-                type="button"
-                onClick={openDoctorSend}
-                className="h-8 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-              >
-                의사에게 전송
-              </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={openDoctorBriefingEdit}
+                    disabled={isDoctorBriefingEditing}
+                    className="h-8 rounded-md border border-blue-300 px-3 text-sm font-semibold text-blue-700 hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    브리핑 수정
+                  </button>
+                  <button
+                    type="button"
+                    onClick={openDoctorSend}
+                    className="h-8 rounded-md border border-slate-300 px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                  >
+                    의사에게 전송
+                  </button>
+                </>
               )}
               <span
                 className={`inline-block rounded-full border px-3 py-1 text-sm font-bold ${getRiskColor(
@@ -231,7 +288,77 @@ function ConsultationDetail({
             </p>
           )}
 
-          {doctorBriefing ? (
+          {isDoctorBriefingEditing ? (
+            <div className="space-y-3 rounded-md border border-blue-200 bg-blue-50 p-3">
+              <label className="block">
+                <span className="mb-1 block text-sm font-semibold text-slate-700">
+                  방문 사유
+                </span>
+                <input
+                  value={doctorBriefingForm.visitReason}
+                  onChange={changeDoctorBriefingField("visitReason")}
+                  className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-base"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-sm font-semibold text-slate-700">
+                  주요 증상 (쉼표 또는 줄바꿈으로 구분)
+                </span>
+                <textarea
+                  value={doctorBriefingForm.mainSymptoms}
+                  onChange={changeDoctorBriefingField("mainSymptoms")}
+                  className="min-h-20 w-full rounded-md border border-slate-300 bg-white p-3 text-base"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-sm font-semibold text-slate-700">
+                  특이사항 (줄바꿈으로 구분)
+                </span>
+                <textarea
+                  value={doctorBriefingForm.specialNotes}
+                  onChange={changeDoctorBriefingField("specialNotes")}
+                  className="min-h-24 w-full rounded-md border border-slate-300 bg-white p-3 text-base"
+                />
+              </label>
+
+              <label className="block">
+                <span className="mb-1 block text-sm font-semibold text-slate-700">
+                  주의도
+                </span>
+                <select
+                  value={doctorBriefingForm.attentionLevel}
+                  onChange={changeDoctorBriefingField("attentionLevel")}
+                  className="h-10 w-full rounded-md border border-slate-300 bg-white px-3 text-base"
+                >
+                  <option value="">미지정</option>
+                  <option value="낮음">낮음</option>
+                  <option value="보통">보통</option>
+                  <option value="높음">높음</option>
+                </select>
+              </label>
+
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsDoctorBriefingEditing(false)}
+                  disabled={isDoctorBriefingSaving}
+                  className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700"
+                >
+                  취소
+                </button>
+                <button
+                  type="button"
+                  onClick={saveDoctorBriefing}
+                  disabled={isDoctorBriefingSaving}
+                  className="h-9 rounded-md bg-blue-700 px-4 text-sm font-semibold text-white disabled:bg-slate-400"
+                >
+                  {isDoctorBriefingSaving ? "저장 중..." : "수정 내용 저장"}
+                </button>
+              </div>
+            </div>
+          ) : doctorBriefing ? (
             <div className="grid grid-cols-2 gap-3 text-base">
               <div className="rounded-md bg-slate-50 p-3">
                 <p className="mb-1 font-semibold text-slate-500">방문 사유</p>

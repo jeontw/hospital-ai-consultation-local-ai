@@ -34,3 +34,10 @@ export const generateDoctorBriefing = (consultationId) => {
     `${BASE_URL}/consultations/${consultationId}/doctor-briefing`,
   );
 };
+
+export const updateDoctorBriefing = (consultationId, data) => {
+  return axios.put(
+    `${BASE_URL}/consultations/${consultationId}/doctor-briefing`,
+    data,
+  );
+};
