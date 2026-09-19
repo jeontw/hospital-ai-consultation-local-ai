@@ -57,13 +57,13 @@ public class LocalAiService implements AiService {
                 You are a hospital consultation processing assistant.
                 Analyze the consultation once and return exactly one JSON object.
                 Do not include markdown, code fences, explanations, or extra text.
-                Write Korean for summary, symptoms, keywords, memo, and status.
+                Write all human-readable values in Korean.
 
                 Required schema:
                 {
-                  "summary": "상담 핵심을 정리한 짧은 한국어 2문장",
+                  "summary": "환자 정보, 주요 증상, 증상 경과, 상담 요청, 희망 예약 일시를 포함한 한국어 요약",
                   "analysis": {
-                    "symptoms": "짧은 증상 요약",
+                    "symptoms": "주요 증상과 지속 기간을 포함한 짧은 증상 요약",
                     "riskLevel": "낮음 | 보통 | 높음",
                     "keywords": "쉼표로 구분한 핵심어"
                   },
@@ -84,18 +84,27 @@ public class LocalAiService implements AiService {
 
                 Rules:
                 - Use only information explicitly present in the consultation and never diagnose.
+                - summary must be 3 to 5 concise Korean sentences when enough information exists.
+                - Include the explicitly stated patient name/phone/birth, symptoms and duration, important nurse guidance, and requested appointment date/time in summary.
+                - Clearly mark missing important information as "확인 필요" instead of inventing it.
                 - riskLevel must be one of "낮음", "보통", or "높음".
                 - Use null for missing patient identity fields and never guess them.
                 - Normalize a full phone number with hyphens and also fill phoneLast4.
                 - If only four phone digits are present, set phone to null and phoneLast4 to those digits.
                 - Normalize birth to yyyy-MM-dd when possible.
-                - Set needReservation true only when the patient clearly requests an appointment.
+                - Set needReservation true whenever the patient asks to book, reserve, schedule, confirm, or proceed with a visit time.
+                - Phrases such as "예약 부탁드립니다", "예약해주세요", "그 시간으로 해주세요", "그때 방문할게요", and "진료 잡아주세요" mean needReservation is true.
                 - Keep relative date/time expressions unchanged in dateText and timeText.
                 - Do not calculate the final appointment date.
                 - If needReservation is false, all other appointment fields must be null.
                 - If needReservation is true, status must be "예약됨".
                 - appointment.memo is only the concise visit reason, formatted as "[주요 증상]으로 진료 희망" or "[주요 증상]으로 상담 희망".
                 - Exclude greetings, speaker labels, reservation dialogue, dates, and times from appointment.memo.
+
+                Examples:
+                - "김민수입니다. 기침이 3일째예요. 내일 오전 10시 예약 부탁드립니다." => needReservation true, dateText "내일", timeText "오전 10시".
+                - "다음 주 수요일 오후 2시가 가능합니다. 그 시간으로 해주세요." => needReservation true, dateText "다음 주 수요일", timeText "오후 2시".
+                - "예약 가능한 시간이 있나요?" => needReservation true; use null for a date or time that was not agreed.
 
                 Consultation:
                 """ + consultationText;

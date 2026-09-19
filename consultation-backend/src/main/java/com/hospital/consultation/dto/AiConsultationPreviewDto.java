@@ -41,6 +41,12 @@ public class AiConsultationPreviewDto {
 
     private String appointmentDate;
 
+    private Boolean needReservation;
+
+    private String appointmentDateText;
+
+    private String appointmentTimeText;
+
     private String visitReason;
 
     private String status;

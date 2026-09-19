@@ -34,6 +34,12 @@ public class AppointmentService {
     private static final String DRAFT_FAILURE_MESSAGE = "예약 초안 생성 실패";
     private static final DateTimeFormatter ISO_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss");
+    private static final Pattern RESERVATION_INTENT_PATTERN = Pattern.compile(
+            "(?:예약(?:을|으로)?\\s*(?:부탁|해\\s*주|해주세요|잡아|원|할게|하려|하고\\s*싶|진행|확정|처리))"
+                    + "|(?:예약(?:을)?\\s*가능[^.!?\\n]{0,8}(?:까요|나요|습니까))"
+                    + "|(?:(?:진료|방문)\\s*(?:예약|일정|시간)?\\s*(?:잡아|부탁|원|할게|해주세요))"
+                    + "|(?:(?:그|이)\\s*(?:시간|날짜|때)(?:으로)?[^.!?\\n]{0,15}(?:해\\s*주|할게|진행|예약|확정|방문))"
+    );
 
     private final AppointmentRepository appointmentRepository;
     private final PatientRepository patientRepository;
@@ -175,10 +181,13 @@ public class AppointmentService {
 
     private AppointmentDraftDto normalizeDraft(AppointmentDraftDto draft, String consultationText) {
         if (draft == null) {
-            return fallbackDraft();
+            draft = new AppointmentDraftDto();
         }
 
         Boolean needReservation = firstNonNull(draft.getNeedReservation(), draft.getAppointmentConfirmed());
+        if (!Boolean.TRUE.equals(needReservation) && containsReservationIntent(consultationText)) {
+            needReservation = Boolean.TRUE;
+        }
         draft.setNeedReservation(Boolean.TRUE.equals(needReservation));
         draft.setAppointmentConfirmed(Boolean.TRUE.equals(needReservation));
 
@@ -208,11 +217,17 @@ public class AppointmentService {
         draft.setDateText(dateText);
         draft.setTimeText(timeText);
 
-        String appointmentDateTime = resolveAppointmentDateTime(
-                dateText,
-                timeText,
-                consultationText
-        );
+        String appointmentDateTime = normalizeIsoDateTime(firstNonBlank(
+                draft.getAppointmentDate(),
+                draft.getAppointmentDateTime()
+        ));
+        if (appointmentDateTime == null) {
+            appointmentDateTime = resolveAppointmentDateTime(
+                    dateText,
+                    timeText,
+                    consultationText
+            );
+        }
 
         draft.setAppointmentDate(appointmentDateTime);
         draft.setAppointmentDateTime(appointmentDateTime);
@@ -224,6 +239,26 @@ public class AppointmentService {
         draft.setMemo(resolveVisitReason(draft, consultationText, dateText, timeText));
 
         return draft;
+    }
+
+    private boolean containsReservationIntent(String consultationText) {
+        if (consultationText == null || consultationText.isBlank()) {
+            return false;
+        }
+
+        return RESERVATION_INTENT_PATTERN.matcher(collapseWhitespace(consultationText)).find();
+    }
+
+    private String normalizeIsoDateTime(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+
+        try {
+            return LocalDateTime.parse(value.trim()).format(ISO_FORMATTER);
+        } catch (DateTimeParseException ignored) {
+            return null;
+        }
     }
 
     private AppointmentDraftDto fallbackDraft() {
@@ -327,6 +362,14 @@ public class AppointmentService {
                 return LocalDate.of(year, month, day);
             }
 
+            Matcher separatedMatcher = Pattern.compile("(\\d{4})[./](\\d{1,2})[./](\\d{1,2})").matcher(normalized);
+            if (separatedMatcher.find()) {
+                int year = Integer.parseInt(separatedMatcher.group(1));
+                int month = Integer.parseInt(separatedMatcher.group(2));
+                int day = Integer.parseInt(separatedMatcher.group(3));
+                return LocalDate.of(year, month, day);
+            }
+
             Matcher yearMatcher = Pattern.compile("(\\d{4})년?(\\d{1,2})월(\\d{1,2})일?").matcher(normalized);
             if (yearMatcher.find()) {
                 int year = Integer.parseInt(yearMatcher.group(1));
@@ -339,7 +382,16 @@ public class AppointmentService {
             if (monthDayMatcher.find()) {
                 int month = Integer.parseInt(monthDayMatcher.group(1));
                 int day = Integer.parseInt(monthDayMatcher.group(2));
-                return LocalDate.of(defaultYear, month, day);
+                LocalDate candidate = LocalDate.of(defaultYear, month, day);
+                return candidate.isBefore(LocalDate.now()) ? candidate.plusYears(1) : candidate;
+            }
+
+            Matcher separatedMonthDayMatcher = Pattern.compile("(?<!\\d)(\\d{1,2})[./](\\d{1,2})(?!\\d)").matcher(normalized);
+            if (separatedMonthDayMatcher.find()) {
+                int month = Integer.parseInt(separatedMonthDayMatcher.group(1));
+                int day = Integer.parseInt(separatedMonthDayMatcher.group(2));
+                LocalDate candidate = LocalDate.of(defaultYear, month, day);
+                return candidate.isBefore(LocalDate.now()) ? candidate.plusYears(1) : candidate;
             }
         } catch (Exception ignored) {
             return null;
@@ -366,11 +418,15 @@ public class AppointmentService {
             return weekStart.plusWeeks(1).plusDays(offset);
         }
 
-        if (compact.contains("주")) {
-            return weekStart.plusDays(offset);
+        LocalDate candidate = weekStart.plusDays(offset);
+        if (compact.contains("이번주")) {
+            return candidate;
         }
 
-        return null;
+        if (!candidate.isAfter(today)) {
+            candidate = candidate.plusWeeks(1);
+        }
+        return candidate;
     }
 
     private DayOfWeek parseDayOfWeek(String normalized) {
@@ -417,6 +473,12 @@ public class AppointmentService {
                 return LocalTime.of(hour, minute);
             }
 
+            Matcher ampmHalfMatcher = Pattern.compile("(오전|오후)\\s*(\\d{1,2})시\\s*반").matcher(normalized);
+            if (ampmHalfMatcher.find()) {
+                int hour = to24Hour(ampmHalfMatcher.group(1), Integer.parseInt(ampmHalfMatcher.group(2)));
+                return LocalTime.of(hour, 30);
+            }
+
             Matcher ampmHourMatcher = Pattern.compile("(오전|오후)\\s*(\\d{1,2})시").matcher(normalized);
             if (ampmHourMatcher.find()) {
                 int hour = Integer.parseInt(ampmHourMatcher.group(2));
@@ -427,6 +489,16 @@ public class AppointmentService {
                     hour = 0;
                 }
                 return LocalTime.of(hour, 0);
+            }
+
+            Matcher koreanHourMatcher = Pattern.compile(
+                    "(오전|오후)?\\s*(한|두|세|네|다섯|여섯|일곱|여덟|아홉|열두|열한|열)\\s*시(?:\\s*(반))?"
+            ).matcher(normalized);
+            if (koreanHourMatcher.find()) {
+                int hour = parseKoreanHour(koreanHourMatcher.group(2));
+                hour = to24Hour(koreanHourMatcher.group(1), hour);
+                int minute = koreanHourMatcher.group(3) == null ? 0 : 30;
+                return LocalTime.of(hour, minute);
             }
 
             Matcher hourMinuteMatcher = Pattern.compile("(\\d{1,2})시\\s*(\\d{1,2})분?").matcher(normalized);
@@ -448,16 +520,48 @@ public class AppointmentService {
         return null;
     }
 
+    private int to24Hour(String meridiem, int hour) {
+        if ("오후".equals(meridiem) && hour < 12) {
+            return hour + 12;
+        }
+        if ("오전".equals(meridiem) && hour == 12) {
+            return 0;
+        }
+        return hour;
+    }
+
+    private int parseKoreanHour(String value) {
+        return switch (value) {
+            case "한" -> 1;
+            case "두" -> 2;
+            case "세" -> 3;
+            case "네" -> 4;
+            case "다섯" -> 5;
+            case "여섯" -> 6;
+            case "일곱" -> 7;
+            case "여덟" -> 8;
+            case "아홉" -> 9;
+            case "열" -> 10;
+            case "열한" -> 11;
+            case "열두" -> 12;
+            default -> throw new IllegalArgumentException("지원하지 않는 시각 표현입니다.");
+        };
+    }
+
     private String extractDateText(String consultationText) {
         if (consultationText == null || consultationText.isBlank()) {
             return null;
         }
 
         String[] patterns = {
+                "\\d{4}[./-]\\d{1,2}[./-]\\d{1,2}",
                 "\\d{4}\\s*년\\s*\\d{1,2}\\s*월\\s*\\d{1,2}\\s*일",
                 "\\d{1,2}\\s*월\\s*\\d{1,2}\\s*일",
+                "(?<!\\d)\\d{1,2}[./]\\d{1,2}(?!\\d)",
                 "이번\\s*주\\s*[월화수목금토일]요일",
                 "다음\\s*주\\s*[월화수목금토일]요일",
+                "오는\\s*[월화수목금토일]요일",
+                "[월화수목금토일]요일",
                 "오늘",
                 "내일",
                 "모레"
@@ -480,7 +584,9 @@ public class AppointmentService {
 
         String[] patterns = {
                 "(오전|오후)\\s*\\d{1,2}시\\s*\\d{1,2}분",
+                "(오전|오후)\\s*\\d{1,2}시\\s*반",
                 "(오전|오후)\\s*\\d{1,2}시",
+                "(오전|오후)?\\s*(한|두|세|네|다섯|여섯|일곱|여덟|아홉|열두|열한|열)\\s*시(?:\\s*반)?",
                 "\\d{1,2}:\\d{2}",
                 "\\d{1,2}시\\s*\\d{1,2}분",
                 "\\d{1,2}시"

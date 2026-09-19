@@ -77,7 +77,7 @@ function App() {
   const [isPreviewConfirming, setIsPreviewConfirming] = useState(false);
   const [consultationPreview, setConsultationPreview] = useState(null);
   const [selectedPatient, setSelectedPatient] = useState(null);
-  const [, setConsultationAppointments] = useState([]);
+  const [consultationAppointments, setConsultationAppointments] = useState([]);
   const [, setPatientAppointments] = useState([]);
   const [allAppointments, setAllAppointments] = useState([]);
   const [selectedPatientAppointments, setSelectedPatientAppointments] = useState([]);
@@ -1041,6 +1041,7 @@ function App() {
             <ConsultationDetail
               key={selectedConsultation?.id || "empty-detail"}
               selectedConsultation={selectedConsultation}
+              consultationAppointments={consultationAppointments}
               getRiskColor={getRiskColor}
               onGenerateDoctorBriefing={createDoctorBriefing}
               onUpdateDoctorBriefing={saveDoctorBriefing}

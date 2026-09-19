@@ -295,6 +295,9 @@ public class ConsultationController {
                 appointmentDraft.getAppointmentDate(),
                 appointmentDraft.getAppointmentDateTime()
         ));
+        preview.setNeedReservation(Boolean.TRUE.equals(appointmentDraft.getNeedReservation()));
+        preview.setAppointmentDateText(appointmentDraft.getDateText());
+        preview.setAppointmentTimeText(appointmentDraft.getTimeText());
         preview.setVisitReason(firstNonBlank(
                 appointmentDraft.getMemo(),
                 appointmentDraft.getPurpose(),
@@ -358,7 +361,13 @@ public class ConsultationController {
                 requestDto.getAppointmentDateTime()
         );
 
-        if (appointmentDateTime != null) {
+        boolean createAppointment = Boolean.TRUE.equals(requestDto.getCreateAppointment())
+                || appointmentDateTime != null;
+
+        if (createAppointment) {
+            if (appointmentDateTime == null) {
+                throw new RuntimeException("예약 날짜와 시간을 확인해주세요.");
+            }
             if (requestDto.getDoctorId() == null) {
                 throw new RuntimeException("담당의사를 선택해주세요.");
             }

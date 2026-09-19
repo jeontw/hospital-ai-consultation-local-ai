@@ -29,6 +29,8 @@ public class AiConsultationConfirmRequestDto {
 
     private LocalDateTime appointmentDateTime;
 
+    private Boolean createAppointment;
+
     private String visitReason;
 
     private String status;

@@ -38,6 +38,7 @@ function normalizeList(value) {
 
 function ConsultationDetail({
   selectedConsultation,
+  consultationAppointments = [],
   getRiskColor,
   onGenerateDoctorBriefing,
   onUpdateDoctorBriefing,
@@ -90,6 +91,13 @@ function ConsultationDetail({
     doctorBriefing?.attentionLevel ||
     selectedConsultation.aiAnalysis?.riskLevel ||
     "";
+  const linkedAppointment = [...consultationAppointments].sort(
+    (a, b) =>
+      new Date(b.appointmentDate || b.appointmentDateTime || 0) -
+      new Date(a.appointmentDate || a.appointmentDateTime || 0),
+  )[0];
+  const linkedAppointmentDate =
+    linkedAppointment?.appointmentDate || linkedAppointment?.appointmentDateTime;
   const buildDoctorSendText = () => {
     return [
       "[환자]",
@@ -195,7 +203,7 @@ function ConsultationDetail({
       </div>
 
       <div className="space-y-3">
-        <div className="grid grid-cols-3 gap-2 rounded-md bg-slate-50 p-3">
+        <div className="grid gap-2 rounded-md bg-slate-50 p-3 sm:grid-cols-2 xl:grid-cols-4">
           <div>
             <p className="text-sm font-medium text-slate-500">환자명</p>
             <p className="mt-1 text-base font-semibold text-slate-900">
@@ -214,6 +222,12 @@ function ConsultationDetail({
               {new Date(selectedConsultation.createdAt).toLocaleString()}
             </p>
           </div>
+          <div>
+            <p className="text-sm font-medium text-slate-500">생년월일</p>
+            <p className="mt-1 text-base font-semibold text-slate-900">
+              {selectedConsultation.patient?.birth || "생년월일 없음"}
+            </p>
+          </div>
         </div>
 
         <div>
@@ -230,11 +244,53 @@ function ConsultationDetail({
           </p>
         </div>
 
-        <div>
-          <p className="mb-2 text-lg font-bold text-slate-900">AI 요약</p>
-          <p className="max-h-32 overflow-auto whitespace-pre-wrap rounded-md bg-slate-50 p-3 text-base leading-7 text-slate-700">
-            {selectedConsultation.summary || "요약 없음"}
-          </p>
+        <div className="rounded-lg border border-sky-200 bg-sky-50/60 p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <p className="text-lg font-bold text-slate-900">상담 요약</p>
+            <span
+              className={`rounded-full px-3 py-1 text-sm font-bold ${
+                linkedAppointment
+                  ? "bg-emerald-100 text-emerald-800"
+                  : "bg-slate-200 text-slate-700"
+              }`}
+            >
+              {linkedAppointment ? linkedAppointment.status || "예약됨" : "연결된 예약 없음"}
+            </span>
+          </div>
+          <div className="mb-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="rounded-md bg-white p-3">
+              <p className="text-xs font-bold text-slate-500">상담 날짜</p>
+              <p className="mt-1 text-sm font-semibold text-slate-900">
+                {new Date(selectedConsultation.createdAt).toLocaleString("ko-KR")}
+              </p>
+            </div>
+            <div className="rounded-md bg-white p-3">
+              <p className="text-xs font-bold text-slate-500">환자 정보</p>
+              <p className="mt-1 text-sm font-semibold leading-6 text-slate-900">
+                {selectedConsultation.patient?.name || "이름 없음"} · {selectedConsultation.patient?.phone || "전화번호 없음"}
+              </p>
+            </div>
+            <div className="rounded-md bg-white p-3">
+              <p className="text-xs font-bold text-slate-500">주요 증상</p>
+              <p className="mt-1 text-sm font-semibold leading-6 text-slate-900">
+                {selectedConsultation.aiAnalysis?.symptoms || "증상 정보 없음"}
+              </p>
+            </div>
+            <div className="rounded-md bg-white p-3">
+              <p className="text-xs font-bold text-slate-500">예약 일정</p>
+              <p className="mt-1 text-sm font-semibold leading-6 text-slate-900">
+                {linkedAppointmentDate
+                  ? `${new Date(linkedAppointmentDate).toLocaleString("ko-KR")} · ${linkedAppointment.doctor?.name || "담당의 미지정"}`
+                  : "예약 없음"}
+              </p>
+            </div>
+          </div>
+          <div className="rounded-md border border-sky-100 bg-white p-3">
+            <p className="mb-1 text-xs font-bold text-slate-500">AI 핵심 내용</p>
+            <p className="max-h-48 overflow-auto whitespace-pre-wrap text-base leading-7 text-slate-800">
+              {selectedConsultation.summary || "요약 없음"}
+            </p>
+          </div>
         </div>
 
         <div className="rounded-md border border-slate-200 bg-white p-3">
