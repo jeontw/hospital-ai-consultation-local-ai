@@ -25,16 +25,16 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
             Long id
     );
 
-    boolean existsByPatientIdAndStatusAndAppointmentDateTimeGreaterThanEqual(
+    boolean existsByPatientIdAndAppointmentDateTimeAndStatus(
             Long patientId,
-            String status,
-            LocalDateTime appointmentDateTime
+            LocalDateTime appointmentDateTime,
+            String status
     );
 
-    boolean existsByPatientIdAndStatusAndAppointmentDateTimeGreaterThanEqualAndIdNot(
+    boolean existsByPatientIdAndAppointmentDateTimeAndStatusAndIdNot(
             Long patientId,
-            String status,
             LocalDateTime appointmentDateTime,
+            String status,
             Long id
     );
 

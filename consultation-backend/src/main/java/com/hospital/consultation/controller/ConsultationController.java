@@ -1,5 +1,6 @@
 package com.hospital.consultation.controller;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hospital.consultation.dto.AiAnalysisResultDto;
 import com.hospital.consultation.dto.AiConsultationConfirmRequestDto;
@@ -249,10 +250,29 @@ public class ConsultationController {
         }
 
         long llmStartedAt = System.nanoTime();
-        AiConsultationBundleDto aiResult = objectMapper.readValue(
-                aiService.analyzeConsultationBundle(analysisInput),
-                AiConsultationBundleDto.class
-        );
+        String rawAiResponse = aiService.analyzeConsultationBundle(analysisInput);
+        AiConsultationBundleDto aiResult = new AiConsultationBundleDto();
+        boolean jsonSuccess = false;
+        String jsonError = null;
+
+        try {
+            JsonNode jsonNode = objectMapper.readTree(rawAiResponse);
+            boolean hasRequiredStructure = jsonNode != null
+                    && jsonNode.isObject()
+                    && jsonNode.has("summary")
+                    && jsonNode.has("analysis")
+                    && jsonNode.has("patient")
+                    && jsonNode.has("appointment");
+
+            if (hasRequiredStructure) {
+                aiResult = objectMapper.treeToValue(jsonNode, AiConsultationBundleDto.class);
+                jsonSuccess = true;
+            } else {
+                jsonError = "필수 JSON 구조가 누락되었습니다.";
+            }
+        } catch (Exception exception) {
+            jsonError = "JSON 파싱 실패: " + exception.getClass().getSimpleName();
+        }
         String summary = firstNonBlank(aiResult.getSummary(), "요약을 생성하지 못했습니다.");
         AiAnalysisResultDto analysisResult = aiResult.getAnalysis() == null
                 ? new AiAnalysisResultDto()
@@ -308,6 +328,9 @@ public class ConsultationController {
         preview.setRecommendedDoctorName(doctorRecommendation.doctorName());
         preview.setDoctorRecommendationReason(doctorRecommendation.reason());
         preview.setAiModel(aiModelSettingsService.getCurrentModel());
+        preview.setJsonSuccess(jsonSuccess);
+        preview.setJsonError(jsonError);
+        preview.setRawAiResponse(rawAiResponse);
         preview.setWhisperProcessingMs(whisperProcessingMs);
         preview.setLlmProcessingMs(llmProcessingMs);
         preview.setTotalProcessingMs(elapsedMillis(totalStartedAt));

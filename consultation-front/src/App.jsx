@@ -26,6 +26,7 @@ import {
   updateAppointmentStatus,
 } from "./api/appointmentApi";
 import { getAiModel, updateAiModel } from "./api/aiModelApi";
+import { resetExperimentData } from "./api/systemApi";
 import {
   createDoctor,
   deleteDoctorById,
@@ -42,6 +43,14 @@ import AppointmentForm from "./components/AppointmentForm";
 import DoctorWeeklyCalendar from "./components/DoctorWeeklyCalendar";
 import DoctorManagement from "./components/DoctorManagement";
 import AiConsultationReviewModal from "./components/AiConsultationReviewModal";
+import PerformanceEvaluationModal from "./components/PerformanceEvaluationModal";
+import {
+  EVALUATION_STORAGE_KEY,
+  createEvaluationRun,
+  loadEvaluationRuns,
+} from "./utils/performanceEvaluation";
+
+const EVALUATION_MODE_STORAGE_KEY = "hospital-ai-performance-collection-enabled";
 
 function getTodayDateInputValue() {
   const now = new Date();
@@ -61,6 +70,12 @@ function App() {
     "exaone3.5:7.8b",
   ]);
   const [isAiModelSaving, setIsAiModelSaving] = useState(false);
+  const [isExperimentResetting, setIsExperimentResetting] = useState(false);
+  const [evaluationRuns, setEvaluationRuns] = useState(loadEvaluationRuns);
+  const [isEvaluationOpen, setIsEvaluationOpen] = useState(false);
+  const [evaluationCollectionEnabled, setEvaluationCollectionEnabled] = useState(
+    () => localStorage.getItem(EVALUATION_MODE_STORAGE_KEY) === "true",
+  );
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -98,6 +113,17 @@ function App() {
   const appointmentDraftCacheRef = useRef(new Map());
   const appointmentDraftInFlightRef = useRef(new Map());
   const lastAutoDraftConsultationIdRef = useRef(null);
+
+  useEffect(() => {
+    localStorage.setItem(EVALUATION_STORAGE_KEY, JSON.stringify(evaluationRuns));
+  }, [evaluationRuns]);
+
+  useEffect(() => {
+    localStorage.setItem(
+      EVALUATION_MODE_STORAGE_KEY,
+      String(evaluationCollectionEnabled),
+    );
+  }, [evaluationCollectionEnabled]);
 
   const fetchPatients = async () => {
     try {
@@ -513,8 +539,18 @@ function App() {
       alert("환자 수정 실패");
     }
   };
+
   const previewAiConsultation = async () => {
     const trimmedNurseMemo = nurseMemo.trim();
+    const evaluationStartedAt = performance.now();
+    const expectedPatient = patients.find(
+      (patient) => String(patient.id) === String(selectedPatientId),
+    );
+
+    if (evaluationCollectionEnabled && audioFile) {
+      alert("성능평가 모드에서는 Whisper를 사용하지 않습니다. 선택한 음성 파일을 해제해주세요.");
+      return;
+    }
 
     if (!audioFile && !trimmedNurseMemo) {
       alert("음성 파일 또는 간호사 메모를 입력하세요");
@@ -533,17 +569,16 @@ function App() {
       formData.append("nurseMemo", trimmedNurseMemo);
 
       const response = await previewConsultation(formData);
-      const selectedTargetPatient = patients.find(
-        (patient) => String(patient.id) === String(selectedPatientId),
-      );
+      const selectedTargetPatient = expectedPatient;
+      let resolvedPreview = response.data;
 
-      if (!audioFile && selectedTargetPatient) {
+      if (!evaluationCollectionEnabled && !audioFile && selectedTargetPatient) {
         const patientCandidates = response.data.patientCandidates || [];
         const hasSelectedPatient = patientCandidates.some(
           (patient) => String(patient.id) === String(selectedTargetPatient.id),
         );
 
-        setConsultationPreview({
+        resolvedPreview = {
           ...response.data,
           patientCandidates: hasSelectedPatient
             ? patientCandidates
@@ -552,15 +587,69 @@ function App() {
           recommendedPatientName: selectedTargetPatient.name,
           patientRecommendationReason:
             "파일 없이 미리보기하여 상담 등록 대상 환자를 기본 선택했습니다.",
-        });
-      } else {
-        setConsultationPreview(response.data);
+        };
       }
+
+      if (evaluationCollectionEnabled) {
+        setEvaluationRuns((current) => [
+          ...current,
+          createEvaluationRun({
+            preview: response.data,
+            inputText: trimmedNurseMemo,
+            expectedPatient,
+            model: aiModel,
+            existingRuns: current,
+            clientProcessingMs: performance.now() - evaluationStartedAt,
+          }),
+        ]);
+      }
+
+      setConsultationPreview(resolvedPreview);
     } catch (error) {
       console.error("AI 미리보기 실패:", error);
+      if (evaluationCollectionEnabled) {
+        setEvaluationRuns((current) => [
+          ...current,
+          createEvaluationRun({
+            inputText: trimmedNurseMemo,
+            expectedPatient,
+            model: aiModel,
+            existingRuns: current,
+            clientProcessingMs: performance.now() - evaluationStartedAt,
+            requestError:
+              error.response?.data?.message || error.message || "분석 요청 실패",
+          }),
+        ]);
+      }
       alert(error.response?.data?.message || "AI 미리보기 실패");
     } finally {
       setIsPreviewLoading(false);
+    }
+  };
+
+  const resetSystemExperimentData = async () => {
+    setIsExperimentResetting(true);
+
+    try {
+      const response = await resetExperimentData();
+      setConsultations([]);
+      setSelectedConsultation(null);
+      setConsultationAppointments([]);
+      setPatientAppointments([]);
+      setAllAppointments([]);
+      setSelectedPatientAppointments([]);
+      setConsultationPreview(null);
+      clearAppointmentDraft();
+      appointmentDraftCacheRef.current.clear();
+      appointmentDraftInFlightRef.current.clear();
+      lastAutoDraftConsultationIdRef.current = null;
+      return response.data;
+    } catch (error) {
+      console.error("실험 데이터 초기화 실패:", error);
+      alert(error.response?.data?.message || "실험 데이터 초기화에 실패했습니다.");
+      return null;
+    } finally {
+      setIsExperimentResetting(false);
     }
   };
   const confirmAiConsultationPreview = async (payload) => {
@@ -933,6 +1022,18 @@ function App() {
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => setIsEvaluationOpen(true)}
+            className={`h-9 rounded-md border px-3 text-sm font-bold shadow-sm ${
+              evaluationCollectionEnabled
+                ? "border-emerald-300 bg-emerald-50 text-emerald-800"
+                : "border-slate-300 bg-white text-slate-700"
+            }`}
+          >
+            성능평가 {evaluationRuns.length}/63
+            {evaluationCollectionEnabled ? " · 수집 중" : ""}
+          </button>
           <div className="flex items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2 py-1 text-xs text-slate-600 shadow-sm">
             <span>환자 {totalPatients}명</span>
             <span className="text-slate-300">|</span>
@@ -949,7 +1050,7 @@ function App() {
               id="ai-model-select"
               value={aiModel}
               onChange={changeAiModel}
-              disabled={isAiModelSaving}
+              disabled={isAiModelSaving || isPreviewLoading}
               className="h-7 rounded border border-slate-300 bg-white px-2 text-xs text-slate-700 disabled:bg-slate-100"
             >
               {aiModelOptions.map((model) => (
@@ -1000,6 +1101,7 @@ function App() {
             previewAiConsultation={previewAiConsultation}
             fileInputRef={fileInputRef}
             isPreviewLoading={isPreviewLoading}
+            evaluationMode={evaluationCollectionEnabled}
           />
 
           <AppointmentForm
@@ -1095,6 +1197,22 @@ function App() {
           onConfirm={confirmAiConsultationPreview}
           isConfirming={isPreviewConfirming}
           onClose={() => setConsultationPreview(null)}
+          evaluationMode={evaluationCollectionEnabled}
+          expectedPatient={patients.find(
+            (patient) => String(patient.id) === String(selectedPatientId),
+          )}
+        />
+      )}
+
+      {isEvaluationOpen && (
+        <PerformanceEvaluationModal
+          runs={evaluationRuns}
+          collectionEnabled={evaluationCollectionEnabled}
+          onChangeCollectionEnabled={setEvaluationCollectionEnabled}
+          onChangeRuns={setEvaluationRuns}
+          onResetSystemData={resetSystemExperimentData}
+          isSystemResetting={isExperimentResetting}
+          onClose={() => setIsEvaluationOpen(false)}
         />
       )}
     </div>

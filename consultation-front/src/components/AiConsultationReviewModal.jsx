@@ -27,6 +27,8 @@ function AiConsultationReviewModal({
   onConfirm,
   isConfirming,
   onClose,
+  evaluationMode = false,
+  expectedPatient = null,
 }) {
   const patientCandidates = preview.patientCandidates || [];
   const [selectedPatientId, setSelectedPatientId] = useState(
@@ -116,7 +118,9 @@ function AiConsultationReviewModal({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4">
       <section className="max-h-[94vh] w-full max-w-6xl overflow-auto rounded-xl bg-white p-5 shadow-xl">
         <div className="mb-4 flex items-center justify-between gap-3">
-          <h2 className="text-xl font-bold text-slate-900">AI 상담 등록 확인</h2>
+          <h2 className="text-xl font-bold text-slate-900">
+            {evaluationMode ? "성능평가 분석 결과" : "AI 상담 등록 확인"}
+          </h2>
           <button
             type="button"
             onClick={onClose}
@@ -125,6 +129,17 @@ function AiConsultationReviewModal({
             닫기
           </button>
         </div>
+
+        {evaluationMode && (
+          <div className="mb-4 rounded-md border border-emerald-200 bg-emerald-50 p-3 text-sm leading-6 text-emerald-900">
+            <p className="font-bold">이 결과는 성능평가 공간에 자동 저장되었습니다.</p>
+            <p>
+              비교용 선택 환자: {expectedPatient?.name || "선택 안 함"} · 시스템 추천 환자: {preview.recommendedPatientName || "추천 없음"}
+            </p>
+            <p>AI가 반환한 추출값과 시스템의 변환·추천 여부만 기록했습니다.</p>
+            <p className="font-semibold">실제 상담·예약 DB에는 반영하지 않았습니다.</p>
+          </div>
+        )}
 
         <div className="mb-4 rounded-lg border border-slate-300 bg-slate-50 p-4">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -138,11 +153,17 @@ function AiConsultationReviewModal({
                   : "bg-slate-200 text-slate-700"
               }`}
             >
-              {form.createAppointment
-                ? form.appointmentDate
-                  ? "예약 생성 예정"
-                  : "예약 일시 확인 필요"
-                : "예약 생성 안 함"}
+              {evaluationMode
+                ? form.createAppointment
+                  ? form.appointmentDate
+                    ? "예약 등록값 추출됨"
+                    : "예약 일시 확인 필요"
+                  : "예약 의도 없음"
+                : form.createAppointment
+                  ? form.appointmentDate
+                    ? "예약 생성 예정"
+                    : "예약 일시 확인 필요"
+                  : "예약 생성 안 함"}
             </span>
           </div>
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -178,7 +199,7 @@ function AiConsultationReviewModal({
           </div>
         </div>
 
-        <div className="mb-4 grid grid-cols-2 gap-2 rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-slate-700 sm:grid-cols-4">
+        <div className="mb-4 grid grid-cols-2 gap-2 rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-slate-700 sm:grid-cols-5">
           <div>
             <p className="font-semibold text-slate-900">Whisper</p>
             <p>{((preview.whisperProcessingMs || 0) / 1000).toFixed(2)}초</p>
@@ -194,6 +215,13 @@ function AiConsultationReviewModal({
           <div>
             <p className="font-semibold text-slate-900">사용 모델</p>
             <p>{preview.aiModel || "확인 불가"}</p>
+          </div>
+          <div>
+            <p className="font-semibold text-slate-900">JSON 구조</p>
+            <p className={preview.jsonSuccess === false ? "font-bold text-red-700" : "font-bold text-emerald-700"}>
+              {preview.jsonSuccess === false ? "실패" : "성공"}
+            </p>
+            {preview.jsonError && <p className="mt-1 text-xs text-red-700">{preview.jsonError}</p>}
           </div>
         </div>
 
@@ -314,6 +342,11 @@ function AiConsultationReviewModal({
                   예약 의도는 찾았지만 정확한 날짜 또는 시간이 없습니다. 일시를 입력해야 예약됩니다.
                 </p>
               )}
+              {!evaluationMode && form.createAppointment && form.appointmentDate && form.doctorId && (
+                <p className="mt-2 rounded-md bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">
+                  확정 등록을 누르면 추출된 날짜·시간과 담당의로 실제 예약이 함께 생성됩니다.
+                </p>
+              )}
               <input
                 value={form.visitReason}
                 onChange={(event) => updateField("visitReason", event.target.value)}
@@ -372,22 +405,34 @@ function AiConsultationReviewModal({
         </div>
 
         <div className="mt-4 flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={isConfirming}
-            className="h-10 rounded-md border border-slate-300 px-4 text-base font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            취소
-          </button>
-          <button
-            type="button"
-            onClick={confirm}
-            disabled={isConfirming}
-            className="h-10 rounded-md bg-slate-800 px-4 text-base font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
-          >
-            {isConfirming ? "등록 중..." : "확정 등록"}
-          </button>
+          {!evaluationMode && (
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isConfirming}
+              className="h-10 rounded-md border border-slate-300 px-4 text-base font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              취소
+            </button>
+          )}
+          {evaluationMode ? (
+            <button
+              type="button"
+              onClick={onClose}
+              className="h-10 rounded-md bg-emerald-700 px-4 text-base font-semibold text-white hover:bg-emerald-600"
+            >
+              결과 확인 완료
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={confirm}
+              disabled={isConfirming}
+              className="h-10 rounded-md bg-slate-800 px-4 text-base font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+            >
+              {isConfirming ? "등록 중..." : "확정 등록"}
+            </button>
+          )}
         </div>
       </section>
     </div>

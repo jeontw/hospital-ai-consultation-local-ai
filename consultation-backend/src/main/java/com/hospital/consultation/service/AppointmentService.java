@@ -52,7 +52,7 @@ public class AppointmentService {
         LocalDateTime appointmentDateTime = getAppointmentDateTime(requestDto);
         Doctor doctor = getDoctor(requestDto.getDoctorId());
         validateDuplicateReservation(doctor.getId(), appointmentDateTime, null);
-        validatePatientActiveReservation(requestDto.getPatientId(), null);
+        validatePatientDuplicateReservation(requestDto.getPatientId(), appointmentDateTime, null);
 
         Appointment appointment = new Appointment();
         appointment.setPatient(getPatient(requestDto.getPatientId()));
@@ -87,7 +87,11 @@ public class AppointmentService {
 
         if (RESERVED_STATUS.equals(status)) {
             validateDuplicateReservation(doctor.getId(), appointmentDateTime, appointmentId);
-            validatePatientActiveReservation(requestDto.getPatientId(), appointmentId);
+            validatePatientDuplicateReservation(
+                    requestDto.getPatientId(),
+                    appointmentDateTime,
+                    appointmentId
+            );
         }
 
         appointment.setPatient(getPatient(requestDto.getPatientId()));
@@ -111,7 +115,11 @@ public class AppointmentService {
                     appointment.getAppointmentDateTime(),
                     appointmentId
             );
-            validatePatientActiveReservation(appointment.getPatient().getId(), appointmentId);
+            validatePatientDuplicateReservation(
+                    appointment.getPatient().getId(),
+                    appointment.getAppointmentDateTime(),
+                    appointmentId
+            );
         }
 
         appointment.setStatus(normalizedStatus);
@@ -370,7 +378,9 @@ public class AppointmentService {
                 return LocalDate.of(year, month, day);
             }
 
-            Matcher yearMatcher = Pattern.compile("(\\d{4})년?(\\d{1,2})월(\\d{1,2})일?").matcher(normalized);
+            Matcher yearMatcher = Pattern.compile(
+                    "(\\d{4})\\s*년?\\s*(\\d{1,2})\\s*월\\s*(\\d{1,2})\\s*일?"
+            ).matcher(normalized);
             if (yearMatcher.find()) {
                 int year = Integer.parseInt(yearMatcher.group(1));
                 int month = Integer.parseInt(yearMatcher.group(2));
@@ -378,7 +388,9 @@ public class AppointmentService {
                 return LocalDate.of(year, month, day);
             }
 
-            Matcher monthDayMatcher = Pattern.compile("(\\d{1,2})월(\\d{1,2})일?").matcher(normalized);
+            Matcher monthDayMatcher = Pattern.compile(
+                    "(\\d{1,2})\\s*월\\s*(\\d{1,2})\\s*일?"
+            ).matcher(normalized);
             if (monthDayMatcher.find()) {
                 int month = Integer.parseInt(monthDayMatcher.group(1));
                 int day = Integer.parseInt(monthDayMatcher.group(2));
@@ -823,26 +835,30 @@ public class AppointmentService {
         }
     }
 
-    private void validatePatientActiveReservation(Long patientId, Long appointmentId) {
+    private void validatePatientDuplicateReservation(
+            Long patientId,
+            LocalDateTime appointmentDateTime,
+            Long appointmentId
+    ) {
         if (patientId == null) {
             throw new RuntimeException("환자 ID가 필요합니다.");
         }
 
         boolean duplicated = appointmentId == null
-                ? appointmentRepository.existsByPatientIdAndStatusAndAppointmentDateTimeGreaterThanEqual(
+                ? appointmentRepository.existsByPatientIdAndAppointmentDateTimeAndStatus(
                         patientId,
-                        RESERVED_STATUS,
-                        LocalDateTime.now()
+                        appointmentDateTime,
+                        RESERVED_STATUS
                 )
-                : appointmentRepository.existsByPatientIdAndStatusAndAppointmentDateTimeGreaterThanEqualAndIdNot(
+                : appointmentRepository.existsByPatientIdAndAppointmentDateTimeAndStatusAndIdNot(
                         patientId,
+                        appointmentDateTime,
                         RESERVED_STATUS,
-                        LocalDateTime.now(),
                         appointmentId
                 );
 
         if (duplicated) {
-            throw new RuntimeException("환자당 예약은 1개만 등록할 수 있습니다.");
+            throw new RuntimeException("해당 환자는 같은 시간에 이미 예약되어 있습니다.");
         }
     }
 

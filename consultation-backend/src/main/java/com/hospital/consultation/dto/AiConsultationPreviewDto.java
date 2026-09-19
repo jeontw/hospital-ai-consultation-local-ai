@@ -59,6 +59,12 @@ public class AiConsultationPreviewDto {
 
     private String aiModel;
 
+    private Boolean jsonSuccess;
+
+    private String jsonError;
+
+    private String rawAiResponse;
+
     private Long whisperProcessingMs;
 
     private Long llmProcessingMs;
